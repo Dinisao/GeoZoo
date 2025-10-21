@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d8cf6e79c9100fa49b5ff6e253477d3f, type: 3}
+  m_Name: ANM_Fox
+  m_EditorClassIdentifier: Assembly-CSharp::AnimalPattern
+  CardSprite: {fileID: 21300000, guid: 009a1aa57bc5038478210e6c320b7408, type: 3}
+  cellsRelatives:
+  - {x: 0, y: 0}
+  - {x: 1, y: 0}
+  - {x: 0, y: 1}
+  - {x: 1, y: 1}
+  cellsRotations: 5a000000b4000000b400000000000000
+  cellsEyeReq: 00000000010000000000000000000000
+  ExigirRotacao: 1
+  PermitirRotacoesGlobais: 1
+  PermitirFlipH: 0
+  PermitirFlipV: 0
+  IgnorarRotacaoNaCelulaEye: 0
+  AceitarMeiaVolta: 0
