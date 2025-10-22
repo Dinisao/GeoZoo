@@ -9,11 +9,15 @@ using UnityEngine;
 /// - Clique: selecionar; Q/E: rodar; Botão direito: virar; Drop numa célula ocupada = SWAP.
 /// - Guarda para AnimalPattern (coords/rotações/eye). Mostra contador de tiles no tabuleiro.
 /// - Botão para renomear o asset atual para "ANM_<Carta>".
+///
+/// Nota geral: esta janela tenta replicar o fluxo do jogo para montar rapidamente um AnimalPattern.
+/// O foco está em UX: arrastar/rodar/virar, normalizar posições e converter rotações UI↔Math ao guardar/carregar.
 public class PatternsBuilderWindow : EditorWindow
 {
     [MenuItem("Tools/GeoZoo/Patterns Builder")]
     public static void Open()
     {
+        // Abre a janela com um tamanho mínimo confortável para grelha + colunas.
         var w = GetWindow<PatternsBuilderWindow>("Patterns Builder");
         w.minSize = new Vector2(1100, 640);
         w.Show();
@@ -65,12 +69,14 @@ public class PatternsBuilderWindow : EditorWindow
     // ---------- Setup ----------
     void OnEnable()
     {
+        // Carrega sprites de cartas existentes na(s) cena(s) e repõe mão/tabuleiro.
         RefreshDecks();
         ResetHand();
     }
 
     void RefreshDecks()
     {
+        // Varrimento tolerante de Decks na(s) cena(s) para extrair as frentes únicas das cartas.
 #if UNITY_2023_1_OR_NEWER
         _decks = UnityEngine.Object.FindObjectsByType<DeckController>(FindObjectsInactive.Include, FindObjectsSortMode.None);
 #else
@@ -91,6 +97,7 @@ public class PatternsBuilderWindow : EditorWindow
 
     void ResetHand()
     {
+        // Repõe a mão (todos os 4 tiles “fora do tabuleiro”).
         for (int i = 0; i < 4; i++)
             _tiles[i] = new TileInst { id = i, onBoard = false, cell = default, rot = 0, back = false };
 
@@ -102,6 +109,7 @@ public class PatternsBuilderWindow : EditorWindow
     // ---------- GUI ----------
     void OnGUI()
     {
+        // Layout: Toolbar topo + 3 colunas (cartas, mão, tabuleiro).
         DrawToolbar();
 
         EditorGUILayout.BeginHorizontal();
@@ -117,6 +125,7 @@ public class PatternsBuilderWindow : EditorWindow
 
     void DrawToolbar()
     {
+        // Ações rápidas e dimensões da grelha (Cols/Rows) com sliders.
         using (new EditorGUILayout.HorizontalScope(EditorStyles.helpBox))
         {
             if (GUILayout.Button("Recarregar Decks", GUILayout.Height(24))) RefreshDecks();
@@ -131,6 +140,7 @@ public class PatternsBuilderWindow : EditorWindow
     // ----- Coluna Cartas -----
     void DrawCardsColumn(params GUILayoutOption[] opts)
     {
+        // Lista de sprites do deck detectados; clicar seleciona e tenta carregar pattern existente.
         EditorGUILayout.BeginVertical(opts);
 
         _scrollCards = EditorGUILayout.BeginScrollView(_scrollCards);
@@ -171,6 +181,7 @@ public class PatternsBuilderWindow : EditorWindow
     // ----- Coluna Mão -----
     void DrawHandColumn(params GUILayoutOption[] opts)
     {
+        // Zona de configuração rápida dos 4 tiles (frentes/versos) e drag a partir da mão.
         EditorGUILayout.BeginVertical(opts);
 
         using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
@@ -217,6 +228,7 @@ public class PatternsBuilderWindow : EditorWindow
 
     void AutoLoadTiles()
     {
+        // Procura F1..F4 e B1..B4 nas pastas indicadas; marca B1/B2 como Eye por convenção.
         _front[0] = FindSprite(_frontFolder, "F1");
         _front[1] = FindSprite(_frontFolder, "F2");
         _front[2] = FindSprite(_frontFolder, "F3");
@@ -235,6 +247,7 @@ public class PatternsBuilderWindow : EditorWindow
 
     static Sprite FindSprite(string folder, string name)
     {
+        // Busca um sprite pelo nome exacto dentro da pasta indicada.
         if (string.IsNullOrEmpty(folder) || !AssetDatabase.IsValidFolder(folder)) return null;
         var guids = AssetDatabase.FindAssets($"{name} t:Sprite", new[] { folder });
         foreach (var g in guids)
@@ -249,6 +262,7 @@ public class PatternsBuilderWindow : EditorWindow
     // ----- Tabuleiro / grelha -----
     void DrawBoardPane()
     {
+        // Painel principal do tabuleiro + barra inferior com ações (guardar/renomear).
         EditorGUILayout.BeginVertical();
 
         using (new EditorGUILayout.HorizontalScope())
@@ -288,6 +302,7 @@ public class PatternsBuilderWindow : EditorWindow
 
     void DrawBoard(Rect rect)
     {
+        // Desenha grelha, tiles no tabuleiro, arraste visual e lida com clique/drag/soltar (inclui SWAP).
         if (Event.current.type == EventType.Repaint)
             EditorGUI.DrawRect(rect, new Color(0.1f,0.1f,0.1f,0.08f));
 
@@ -372,6 +387,7 @@ public class PatternsBuilderWindow : EditorWindow
     // ---------- Drag helpers ----------
     void BeginDrag(int idx, Vector2 mouse)
     {
+        // Marca início do arraste e guarda estado para possível reversão.
         _dragging = true;
         _dragStartMouse = mouse;
         _dragStartState = _tiles[idx];
@@ -380,6 +396,7 @@ public class PatternsBuilderWindow : EditorWindow
 
     int FindTileIndexAtCell(Vector2Int cell)
     {
+        // Procura qual tile está numa célula (para SWAP).
         for (int i = 0; i < 4; i++)
             if (_tiles[i].onBoard && _tiles[i].cell == cell) return i;
         return -1;
@@ -387,6 +404,7 @@ public class PatternsBuilderWindow : EditorWindow
 
     void EndDrag(Vector2 mouse)
     {
+        // Lógica de soltar: coloca, troca (SWAP) ou reverte. Também aceita “voltar à mão” sobre o slot.
         if (_sel < 0 || _sel >= 4) { _dragging = false; return; }
 
         var t = _tiles[_sel];
@@ -447,6 +465,7 @@ public class PatternsBuilderWindow : EditorWindow
     // ---------- Teclado ----------
     void HandleKeyboard()
     {
+        // Rotação Q/E do tile selecionado (clockwise/anticlockwise) — ignorado se estiver a arrastar.
         var e = Event.current;
         if (e.type != EventType.KeyDown || _dragging) return;
 
@@ -466,6 +485,7 @@ public class PatternsBuilderWindow : EditorWindow
 
     void RenameCurrentToSuggested()
     {
+        // Renomeia o asset atual para “ANM_<Carta>”, mantendo a pasta e evitando conflitos.
         if (!_current) return;
         var suggested = SuggestedAssetName();
         var path = AssetDatabase.GetAssetPath(_current);
@@ -485,6 +505,7 @@ public class PatternsBuilderWindow : EditorWindow
 
     string SuggestedAssetName()
     {
+        // Sugestão baseada na carta selecionada; fallback para nome atual do asset.
         string baseName = (_selectedSpriteIndex >= 0 && _selectedSpriteIndex < _deckSprites.Count && _deckSprites[_selectedSpriteIndex])
             ? _deckSprites[_selectedSpriteIndex].name
             : (_current ? _current.name.Replace("ANM_","") : "Novo");
@@ -493,6 +514,8 @@ public class PatternsBuilderWindow : EditorWindow
 
     void CreateOrSelectPatternForSprite(Sprite s)
     {
+        // Cria um novo AnimalPattern para a sprite (se não existir) com flags default,
+        // ou seleciona o existente; depois carrega-o na janela.
         var ap = FindPatternByCardSprite(s);
         if (ap == null)
         {
@@ -519,6 +542,7 @@ public class PatternsBuilderWindow : EditorWindow
 
     AnimalPattern FindPatternByCardSprite(Sprite s)
     {
+        // Procura em todos os AnimalPattern por referência direta ao CardSprite.
         var guids = AssetDatabase.FindAssets("t:AnimalPattern");
         foreach (var g in guids)
         {
@@ -530,6 +554,7 @@ public class PatternsBuilderWindow : EditorWindow
 
     void LoadPattern(AnimalPattern ap)
     {
+        // Carrega o asset para a janela: recria o layout de tiles conforme o pattern.
         _current = ap;
         ResetHand();
 
@@ -554,6 +579,7 @@ public class PatternsBuilderWindow : EditorWindow
 
         if (rel.Count > 0)
         {
+            // Normaliza para que o conjunto fique “encostado” ao topo-esquerdo do tabuleiro.
             int minX = rel.Min(v => v.x);
             int minY = rel.Min(v => v.y);
             for (int i = 0; i < 4; i++)
@@ -572,6 +598,7 @@ public class PatternsBuilderWindow : EditorWindow
 
     void SaveToPattern(AnimalPattern ap)
     {
+        // Extrai os tiles no tabuleiro, normaliza posições (UI) e converte rotações para "math/CCW" antes de guardar.
         var onBoard = new List<TileInst>();
         for (int i = 0; i < 4; i++) if (_tiles[i].onBoard) onBoard.Add(_tiles[i]);
 
@@ -618,6 +645,7 @@ public class PatternsBuilderWindow : EditorWindow
     // ---------- Utils ----------
     static int NormRot(int deg)
     {
+        // “Arredonda” graus para múltiplos de 90 em [0, 360).
         int g = deg % 360; if (g < 0) g += 360;
         int q = Mathf.RoundToInt(g / 90f) * 90;
         q = (q % 360 + 360) % 360;
@@ -632,6 +660,7 @@ public class PatternsBuilderWindow : EditorWindow
 
     static void EnsureFolder(string folderPath)
     {
+        // Garante que a pasta de destino existe (cria intermedárias se necessário).
         if (AssetDatabase.IsValidFolder(folderPath)) return;
         var parts = folderPath.Split('/');
         string cur = "Assets";
@@ -645,6 +674,7 @@ public class PatternsBuilderWindow : EditorWindow
     }
     static string MakeSafeFileName(string s)
     {
+        // Remove caracteres inválidos para nomes de ficheiro no SO.
         foreach (var c in System.IO.Path.GetInvalidFileNameChars()) s = s.Replace(c, '_');
         return s;
     }

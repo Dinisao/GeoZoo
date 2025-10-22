@@ -1,3 +1,8 @@
+// GestorGrelha.cs — Constrói e gere a grelha de jogo (UI).
+// Define o GridLayout (tamanho, spacing, padding), cria/destrói células,
+// faz auto-resize do container, spawna peças na mão (opcional) e
+// expõe utilitários para redimensionar peças e recolhê-las para a mão.
+
 using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
@@ -36,11 +41,13 @@ public class GestorGrelha : MonoBehaviour
     public bool DebugLogs = true;
     public Color CorCelula = new Color(1f, 1f, 1f, 0.06f);
 
+    // Repõe valores sensatos no Inspector quando o componente é adicionado.
     void Reset()
     {
         if (Padding == null) Padding = new RectOffset(8, 8, 8, 8);
     }
 
+    // Reflete alterações de Inspector imediatamente (layout, tamanho e ajuste de peças).
     void OnValidate()
     {
         if (Padding == null) Padding = new RectOffset(8, 8, 8, 8);
@@ -52,6 +59,7 @@ public class GestorGrelha : MonoBehaviour
         }
     }
 
+    // Setup inicial: garante GridLayout, aplica configuração e constrói a grelha.
     void Awake()
     {
         if (Padding == null) Padding = new RectOffset(8, 8, 8, 8);
@@ -72,6 +80,7 @@ public class GestorGrelha : MonoBehaviour
         if (SpawnPecasNaMaoAoIniciar) SpawnPecasIniciaisNaMao();
     }
 
+    // Aplica os parâmetros de layout atuais ao GridLayoutGroup.
     void ConfigurarGridLayout()
     {
         GridLayout.cellSize       = CellSize;
@@ -84,6 +93,7 @@ public class GestorGrelha : MonoBehaviour
         GridLayout.constraintCount = Colunas;
     }
 
+    // Ajusta o Rect do GridRoot para comportar todas as células segundo CellSize/Spacing/Padding.
     void AjustarTamanhoGridRoot()
     {
         float w = Padding.left + Padding.right  + Colunas * CellSize.x + (Colunas - 1) * Spacing.x;
@@ -93,6 +103,7 @@ public class GestorGrelha : MonoBehaviour
         GridRoot.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical,   h);
     }
 
+    // Reconstrói a grelha completa: remove células antigas e cria novas com índices X/Y.
     public void CriarOuRecriarGrelha()
     {
         if (!GridRoot) return;
@@ -139,6 +150,7 @@ public class GestorGrelha : MonoBehaviour
             Debug.Log($"[GestorGrelha] Grelha criada: {Colunas}x{Linhas} ({Colunas * Linhas}).", this);
     }
 
+    // Spawna peças iniciais na mão (respeita a flag para evitar duplicação).
     public void SpawnPecasIniciaisNaMao()
     {
         if (!MaoContainer || !PF_Peca)
@@ -178,6 +190,7 @@ public class GestorGrelha : MonoBehaviour
         if (DebugLogs) Debug.Log($"[GestorGrelha] Spawn inicial concluído ({n}).", this);
     }
 
+    // Reaplica tamanho/anchors das peças que já estão na grelha para casar com o cellSize atual.
     public void RedimensionarPecasNaGrelha()
     {
         foreach (Transform t in GridRoot)
@@ -198,7 +211,7 @@ public class GestorGrelha : MonoBehaviour
     }
 
     // -------- NOVO: utilitário para o pós-acerto --------
-    // Recolhe todas as peças que estejam colocadas nas células da grelha
+    // Percorre as células e pede a cada peça colocada que regresse à mão.
     public void RecolherTodasPecasParaMao()
     {
         if (!GridRoot) return;

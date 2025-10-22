@@ -1,3 +1,7 @@
+// CelulaGrelha.cs — Uma célula da grelha de jogo.
+// Mantém o índice (x,y) e pinta o fundo conforme estado: idle, hover permitido ou hover bloqueado.
+// É “transparente” a cliques (raycastTarget = false) para não interferir com drag & drop.
+
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -13,6 +17,7 @@ public class CelulaGrelha : MonoBehaviour
     public Color CorHover = new Color(1f, 1f, 1f, 0.16f);         // célula livre sob cursor
     public Color CorBloq  = new Color(1f, 0.3f, 0.3f, 0.18f);     // célula ocupada sob cursor
 
+    // Configura o fundo visual da célula (sprite 9-slice opcional, cor idle, sem bloquear cliques).
     void Awake()
     {
         if (!Bg) Bg = GetComponent<Image>();
@@ -24,6 +29,7 @@ public class CelulaGrelha : MonoBehaviour
         }
     }
 
+    // Atualiza a cor de hover: usa CorHover se permitido, CorBloq se ocupado; caso contrário volta a CorIdle.
     public void SetHover(bool on, bool permitido)
     {
         if (!Bg) return;

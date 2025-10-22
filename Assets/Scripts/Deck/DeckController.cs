@@ -1,3 +1,8 @@
+// DeckController.cs — Gere a compra de cartas e o “gating” do deck.
+// Responsável por: animar deck→centro→preview via CardAnimator, definir a carta ativa,
+// avisar o GridValidator sobre o padrão correspondente e controlar quando o deck pode/ não pode ser clicado.
+// O desbloqueio do deck acontece após a grelha estar correta e a limpeza do preview terminar.
+
 using System;
 using System.Collections;
 using System.Linq;
@@ -41,6 +46,7 @@ public class DeckController : MonoBehaviour
         public Sprite Verso;
     }
 
+    // Liga o clique do botão do deck ao handler local e faz um sanity-check de refs.
     void Awake()
     {
         Log("Awake.");
@@ -56,13 +62,17 @@ public class DeckController : MonoBehaviour
         }
     }
 
+    // Marca o deck como indisponível para novos cliques (gating manual).
     public void BloquearDeck()    { _deckBloqueado = true; }
+
+    // Volta a permitir cliques no deck.
     public void DesbloquearDeck() { _deckBloqueado = false; }
 
     /// <summary>
     /// Limpa a carta atual e faz fade-out do preview, quer seja por Image dedicada
     /// (imgPreview) quer seja por clone filho de posPreview.
     /// </summary>
+    // Responsável por apagar o “estado visual” da carta em preview e cortar interação de tiles.
     public void LimparCartaAtual()
     {
         TemCartaAtual = false;
@@ -103,6 +113,7 @@ public class DeckController : MonoBehaviour
         }
     }
 
+    // Espera o término do fade da imagem de preview para remover o sprite (mantendo-a invisível).
     IEnumerator _CoClearPreviewImage(Image target, float delay)
     {
         // espera o fade terminar antes de remover o sprite
@@ -112,6 +123,7 @@ public class DeckController : MonoBehaviour
         if (target && target.canvasRenderer != null) target.canvasRenderer.SetAlpha(0f);
     }
 
+    // Pequena rotina de fade-out para clones temporários e destruição segura do GO.
     IEnumerator FadeAndDestroy(GameObject go, CanvasGroup cg, float dur)
     {
         float t = 0f;
@@ -125,6 +137,8 @@ public class DeckController : MonoBehaviour
         if (go) Destroy(go);
     }
 
+    // Handler do clique no deck: aplica “gating”, escolhe um par, invoca a animação
+    // e, no callback, define a carta atual, atualiza preview, e informa o GridValidator.
     void OnDeckClick()
     {
         if (_busy) { Log("Ignorado (busy)."); return; }
@@ -177,6 +191,7 @@ public class DeckController : MonoBehaviour
     /// CHAMADO pelo GridValidator quando o estado de validação muda.
     /// Mantemos o deck bloqueado aqui; o desbloqueio agora acontece no fim da limpeza (GridValidator).
     /// </summary>
+    // Apenas regista a mudança; o fluxo de desbloqueio acontece depois, coordenado com a limpeza do preview.
     public void OnGridValidationChanged(bool valido, bool completo)
     {
         Log($"[Deck] Grid ok? valido={valido} completo={completo}");
@@ -197,6 +212,7 @@ public class DeckController : MonoBehaviour
         }
     }
 
+    // Escolhe o próximo par (sequencial ou aleatório) respeitando o array ‘Cartas’.
     FacePair EscolherPar()
     {
         if (Cartas == null || Cartas.Length == 0) return default;
@@ -214,7 +230,7 @@ public class DeckController : MonoBehaviour
         }
     }
 
-    // Mapeia FacePair -> AnimalPattern via PatternRegistry
+    // Mapeia FacePair -> AnimalPattern via PatternRegistry (por Sprite, por Id exato, depois contains).
     AnimalPattern ResolverPattern(FacePair par)
     {
         var reg = FindOne<PatternRegistry>();
@@ -255,6 +271,7 @@ public class DeckController : MonoBehaviour
         return null;
     }
 
+    // Verifica se todas as referências essenciais estão preenchidas e se as cartas têm Frente/Verso.
     bool ValidarRefs()
     {
         if (imgDeckBack == null) { LogErr("imgDeckBack NULL."); return false; }
@@ -272,6 +289,7 @@ public class DeckController : MonoBehaviour
         return true;
     }
 
+    // Helpers de logging com tag de classe para facilitar o filtro no Console.
     void Log(string m){ if (debugLogs) Debug.Log($"[DeckController] {m}", this); }
     void LogWarn(string m){ if (debugLogs) Debug.LogWarning($"[DeckController] {m}", this); }
     void LogErr(string m){ Debug.LogError($"[DeckController] {m}", this); }

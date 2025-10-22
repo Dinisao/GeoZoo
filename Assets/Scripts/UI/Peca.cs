@@ -1,3 +1,8 @@
+// Peca.cs — Peça arrastável/rodável da grelha.
+// Lida com: drag & drop para células, rotação (Q/E) enquanto premida,
+// flip no botão direito (via PecaFlip), highlight de célula sob o cursor,
+// recolha para a mão (instantânea ou animada) e gating de interação com o jogo.
+
 using System;
 using System.Collections;
 using UnityEngine;
@@ -13,7 +18,7 @@ public class Peca : MonoBehaviour,
 {
     public static event Action OnPecaStateChanged;
 
-    // Refs
+    // Refs internas (UI/RT/interaction)
     RectTransform _rt;
     Image _img;
     CanvasGroup _cg;
@@ -25,7 +30,7 @@ public class Peca : MonoBehaviour,
     RectTransform _maoContainer;
     RectTransform _dragLayer;
 
-    // Estado
+    // Estado de input/drag/rotação
     bool _dragging;
     bool _leftHeld;                // rotação Q/E enquanto carregado
     Transform _paiOriginal;
@@ -37,6 +42,7 @@ public class Peca : MonoBehaviour,
     // Lido pelo GridValidator
     public int RotacaoGraus => (_rotacoes90 * 90);
 
+    // Cache de componentes essenciais; garante CanvasGroup presente.
     void Awake()
     {
         _rt = GetComponent<RectTransform>();
@@ -46,6 +52,7 @@ public class Peca : MonoBehaviour,
         if (_cg == null) _cg = gameObject.AddComponent<CanvasGroup>();
     }
 
+    // Inicializa “tamanho na mão” e elimina riscos de escala herdada.
     void Start()
     {
         _tamanhoMao = _rt.sizeDelta; // tamanho “na mão”
@@ -55,6 +62,7 @@ public class Peca : MonoBehaviour,
         if (gfx0) gfx0.rectTransform.localScale = Vector3.one;
     }
 
+    // Recebe as referências do contexto (grelha/mão/layer de drag) vindas do GestorGrelha.
     public void ConfigurarContexto(RectTransform gridRoot, GridLayoutGroup gridLayout, RectTransform maoContainer, RectTransform dragLayer)
     {
         _gridRoot     = gridRoot;
@@ -63,6 +71,7 @@ public class Peca : MonoBehaviour,
         _dragLayer    = dragLayer;
     }
 
+    // Enquanto a peça está clicada/dragging, permite rotação por Q/E (se interação for permitida).
     void Update()
     {
         if (!(_leftHeld || _dragging)) return;
@@ -72,6 +81,7 @@ public class Peca : MonoBehaviour,
         if (Input.GetKeyDown(KeyCode.E)) Rodar(+1);
     }
 
+    // Ajusta a rotação em incrementos de 90° e aplica no visual (filho Image, se existir).
     void Rodar(int dir)
     {
         _rotacoes90 = (_rotacoes90 + dir) % 4;
@@ -86,6 +96,7 @@ public class Peca : MonoBehaviour,
 
     // ---------- Clique/Press ----------
 
+    // Início de clique: guarda estado do botão esquerdo para rotação; no botão direito pede flip (PecaFlip).
     public void OnPointerDown(PointerEventData eventData)
     {
         if (!PodeInteragir()) return;
@@ -102,6 +113,7 @@ public class Peca : MonoBehaviour,
         }
     }
 
+    // Solta o “held” do botão esquerdo (para parar rotação por tecla).
     public void OnPointerUp(PointerEventData eventData)
     {
         if (eventData.button == PointerEventData.InputButton.Left)
@@ -110,6 +122,7 @@ public class Peca : MonoBehaviour,
 
     // ---------- Drag & Drop ----------
 
+    // Começa o drag: move para a dragLayer, desativa raycasts temporariamente e ajusta tamanho à célula.
     public void OnBeginDrag(PointerEventData eventData)
     {
         if (!PodeInteragir()) { eventData.pointerDrag = null; return; }
@@ -138,6 +151,7 @@ public class Peca : MonoBehaviour,
         SeguirRato(eventData);
     }
 
+    // Durante o drag: segue o cursor e atualiza o highlight da célula sob o rato (permitida/bloqueada).
     public void OnDrag(PointerEventData eventData)
     {
         if (!_dragging) return;
@@ -162,6 +176,7 @@ public class Peca : MonoBehaviour,
         }
     }
 
+    // Termina o drag: tenta “snap” na célula; se falhar, regressa à mão e repõe o estado visual completo.
     public void OnEndDrag(PointerEventData eventData)
     {
         if (!_dragging) return;
@@ -191,6 +206,7 @@ public class Peca : MonoBehaviour,
         OnPecaStateChanged?.Invoke();
     }
 
+    // Mantém a peça debaixo do cursor, usando o espaço do dragLayer para evitar saltos.
     void SeguirRato(PointerEventData eventData)
     {
         if (_dragLayer == null) return;
@@ -201,6 +217,7 @@ public class Peca : MonoBehaviour,
         }
     }
 
+    // Devolve a célula (RectTransform) sob o cursor, filtrando só as que têm CelulaGrelha.
     RectTransform CelulaDebaixoDoCursor(Vector2 screenPos, Camera cam)
     {
         if (_gridRoot == null) return null;
@@ -214,6 +231,8 @@ public class Peca : MonoBehaviour,
         return null;
     }
 
+    // Tenta encaixar a peça na célula sob o cursor (se estiver livre).
+    // Também normaliza anchors/posição/escala para casar com a grelha.
     bool TentarSnapNaGrelha(PointerEventData eventData)
     {
         if (_gridRoot == null || _gridLayout == null) return false;
@@ -236,7 +255,7 @@ public class Peca : MonoBehaviour,
 
     // -------- NOVOS MÉTODOS DE RECOLHA --------
 
-    // Anima a peça a “voltar” até ao centro da barra da mão e só depois repõe o estado real.
+    // Anima a peça a regressar para a mão (suave e curto) e, no fim, chama VoltarParaMao() para consolidar.
     public IEnumerator AnimarVoltarParaMao(float dur = 0.25f)
     {
         if (_maoContainer == null || _dragLayer == null)
@@ -264,7 +283,7 @@ public class Peca : MonoBehaviour,
         Vector3 s0 = _rt.localScale;
         Vector3 s1 = s0 * 0.85f;
 
-        // Corre a animação
+        // Corre a animação (ease smoothstep)
         float t = 0f;
         while (t < 1f)
         {
@@ -285,7 +304,7 @@ public class Peca : MonoBehaviour,
         VoltarParaMao();
     }
 
-    // Faz a peça regressar à mão do jogador (instantâneo; Layout reposiciona)
+    // Regressa de imediato à mão (sem animação). Layout reposiciona no container.
     public void VoltarParaMao()
     {
         if (_maoContainer == null) return;
@@ -306,6 +325,7 @@ public class Peca : MonoBehaviour,
         OnPecaStateChanged?.Invoke();
     }
 
+    // Gate de interação: depende da flag global do ControladorJogo e de existir carta ativa no Deck.
     bool PodeInteragir()
     {
         if (ControladorJogo.Instancia && !ControladorJogo.Instancia.InteracaoPermitida) return false;
@@ -316,6 +336,7 @@ public class Peca : MonoBehaviour,
         return true;
     }
 
+    // Utilitário para converter world→local num RectTransform (respeitando a câmara do Canvas).
     static Vector2 WorldToLocal(RectTransform parent, Vector3 worldPos, Camera cam)
     {
         Vector2 sp = RectTransformUtility.WorldToScreenPoint(cam, worldPos);

@@ -1,3 +1,7 @@
+// ControladorJogo.cs — Gere HUD, temporizador e pontuação (+ gating de interação de tiles).
+// Mantém um singleton simples para acesso global (Instancia), atualiza o UI (tempo/ZOO),
+// e expõe chamadas para iniciar/parar/reiniciar o timer, recompensar acertos e ligar/desligar interação.
+
 using TMPro;
 using UnityEngine;
 using System.Collections;
@@ -21,6 +25,7 @@ public class ControladorJogo : MonoBehaviour
     bool _timerAtivo;
     Coroutine _tick;
 
+    // Setup do singleton + estado inicial do jogo (tempo e HUD).
     void Awake()
     {
         if (Instancia != null && Instancia != this) { Destroy(gameObject); return; }
@@ -31,7 +36,8 @@ public class ControladorJogo : MonoBehaviour
         AtualizarHUD();
     }
 
-    // Chama isto quando a carta estaciona no preview (já está no DeckController)
+    // Arranca o temporizador se ainda não estiver a contar.
+    // Chamado quando a carta estaciona no preview (coordenado pelo DeckController).
     public void IniciarTimerSeAindaNao()
     {
         if (_timerAtivo) return;
@@ -42,6 +48,7 @@ public class ControladorJogo : MonoBehaviour
         _tick = StartCoroutine(TickTimer());
     }
 
+    // Pausa o temporizador (não reseta o tempo restante).
     public void PararTimer()
     {
         _timerAtivo = false;
@@ -49,6 +56,7 @@ public class ControladorJogo : MonoBehaviour
         _tick = null;
     }
 
+    // Para o temporizador e repõe o tempo no valor inicial.
     public void ReiniciarTimer()
     {
         PararTimer();
@@ -56,11 +64,13 @@ public class ControladorJogo : MonoBehaviour
         AtualizarHUD();
     }
 
+    // Liga/desliga a interação do jogador com os tiles (gating de jogabilidade).
     public void DefinirInteracaoTiles(bool ativo)
     {
         InteracaoPermitida = ativo;
     }
 
+    // Aplica recompensa por padrão correto: +1 no ZOO e +20s no relógio.
     public void RecompensaAcerto()
     {
         _zoo += 1;
@@ -68,6 +78,8 @@ public class ControladorJogo : MonoBehaviour
         AtualizarHUD();
     }
 
+    // Loop do temporizador: de segundo a segundo, reduz o tempo e atualiza o HUD.
+    // Quando chega a 0, pára e fica pronto para acionar um “Game Over” externo.
     IEnumerator TickTimer()
     {
         while (_timerAtivo && _tempoRestante > 0)
@@ -86,12 +98,14 @@ public class ControladorJogo : MonoBehaviour
         }
     }
 
+    // Atualiza os textos do HUD com o ZOO e o tempo formatado (M:SS).
     void AtualizarHUD()
     {
         if (TxtZoo)   TxtZoo.text   = $"ZOO: {_zoo}";
         if (TxtTempo) TxtTempo.text = $"TIME: {Formatar(_tempoRestante)}";
     }
 
+    // Converte segundos em "m:ss".
     string Formatar(int segundos)
     {
         int m = Mathf.Max(0, segundos) / 60;

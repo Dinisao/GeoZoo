@@ -1,3 +1,6 @@
+// AnimalWinVFX.cs — Overlay de vídeo quando um animal é concluído.
+// Mapeia carta→clip, prepara o VideoPlayer/RenderTexture e mostra com fade,
+// opcionalmente alinhando o overlay à região da grelha por reparent ou ajuste de rect.
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -62,13 +65,13 @@ public class AnimalWinVFX : MonoBehaviour
     Canvas _cachedCanvas;
     RectTransform _parentRT;
 
-    // guardas para reparent
     Transform _origParent;
     int _origSibling;
     Vector2 _origAnchorMin, _origAnchorMax, _origPivot, _origSizeDelta, _origAnchoredPos;
 
     public bool IsPlaying => _busy;
 
+    // Inicializa referências (RawImage, CanvasGroup, VideoPlayer), reseta alpha e prepara player/mapa.
     void Awake()
     {
         if (!Player) Player = GetComponent<VideoPlayer>();
@@ -87,8 +90,8 @@ public class AnimalWinVFX : MonoBehaviour
         if (Target)
         {
             Target.enabled = false;
-            Target.color = Color.white; // cor multiplica o vídeo
-            var tr = Target.rectTransform; // garantir que o RawImage preenche o rect do overlay
+            Target.color = Color.white;
+            var tr = Target.rectTransform;
             tr.anchorMin = Vector2.zero;
             tr.anchorMax = Vector2.one;
             tr.offsetMin = Vector2.zero;
@@ -99,12 +102,14 @@ public class AnimalWinVFX : MonoBehaviour
         BuildMap();
     }
 
+    // Garante que o overlay começa invisível e não bloqueia raycasts quando ativado.
     void OnEnable()
     {
         if (Group) { Group.alpha = 0f; Group.blocksRaycasts = false; }
         if (Target) Target.enabled = false;
     }
 
+    // Liberta o RenderTexture próprio, se foi criado neste componente.
     void OnDestroy()
     {
         if (_ownRT && Player && Player.targetTexture)
@@ -116,6 +121,7 @@ public class AnimalWinVFX : MonoBehaviour
         }
     }
 
+    // Configurações do VideoPlayer (playOnAwake, loop, áudio off, RenderTexture alvo).
     void SetupPlayer()
     {
         if (!Player) return;
@@ -135,6 +141,7 @@ public class AnimalWinVFX : MonoBehaviour
         }
     }
 
+    // Constroi dicionários para procurar rapidamente o clip a partir do sprite (por referência e por nome).
     void BuildMap()
     {
         _mapByRef = new Dictionary<Sprite, VideoClip>();
@@ -154,6 +161,7 @@ public class AnimalWinVFX : MonoBehaviour
         }
     }
 
+    // Entrada habitual: decide o clip a partir do pattern/carta atual e arranca a reprodução.
     public IEnumerator PlayForRoutine(AnimalPattern pattern)
     {
         Sprite cand1 = (pattern != null ? pattern.CardSprite : null);
@@ -177,6 +185,7 @@ public class AnimalWinVFX : MonoBehaviour
         yield return PlayClipRoutine(clip);
     }
 
+    // Alternativa: decide o clip diretamente a partir de um sprite fornecido.
     public IEnumerator PlayForRoutine(Sprite cardSprite)
     {
         var clip = ResolveClip(cardSprite, Deck != null ? Deck.CartaAtual : null);
@@ -188,6 +197,7 @@ public class AnimalWinVFX : MonoBehaviour
         yield return PlayClipRoutine(clip);
     }
 
+    // Aplica a prioridade de escolha: referência → nome → carta do deck → fallback.
     VideoClip ResolveClip(Sprite primary, Sprite secondary)
     {
         if (primary && _mapByRef != null && _mapByRef.TryGetValue(primary, out var clipRef))
@@ -218,12 +228,12 @@ public class AnimalWinVFX : MonoBehaviour
         return null;
     }
 
+    // Fluxo completo: preparar RT, alinhar overlay, fade in, tocar, seguir região (se necessário) e fade out.
     IEnumerator PlayClipRoutine(VideoClip clip)
     {
         if (_busy || !Player || clip == null) yield break;
         _busy = true;
 
-        // RT
         if (AutoCreateRenderTexture && !SharedRT)
         {
             int w = Mathf.Max((int)clip.width,  16);
@@ -252,7 +262,6 @@ public class AnimalWinVFX : MonoBehaviour
         if (Target && Target.texture != Player.targetTexture)
             Target.texture = Player.targetTexture;
 
-        // Aspect dentro da região
         if (Target)
         {
             var arf = Target.GetComponent<AspectRatioFitter>();
@@ -263,15 +272,12 @@ public class AnimalWinVFX : MonoBehaviour
 
         if (debugLogs) Debug.Log($"[AnimalWinVFX] Preparado: {clip.name} ({clip.width}x{clip.height})", this);
 
-        // ---- alinhar à região ----
         bool didReparent = false;
         if (GridRegion && ReparentToRegion)
             didReparent = BeginRegionAttach();
         else if (GridRegion && AutoSizeToRegion)
             MatchToRegionNow();
-        // --------------------------
 
-        // Fade in
         if (Group)
         {
             if (Target) Target.enabled = true;
@@ -282,7 +288,6 @@ public class AnimalWinVFX : MonoBehaviour
 
         Player.Play();
 
-        // Seguir região se não reparentaste
         if (!didReparent && GridRegion && AutoSizeToRegion && FollowRegionEveryFrame)
         {
             while (Player.isPlaying)
@@ -296,7 +301,6 @@ public class AnimalWinVFX : MonoBehaviour
             while (Player.isPlaying) yield return null;
         }
 
-        // Fade out
         if (Group)
         {
             yield return FadeTo(0f, FadeOut);
@@ -305,13 +309,12 @@ public class AnimalWinVFX : MonoBehaviour
         }
         else if (Target) Target.enabled = false;
 
-        // desfazer reparent
         if (didReparent) EndRegionAttach();
 
         _busy = false;
     }
 
-    // ---------- Região: reparent seguro ----------
+    // Se configurado, faz reparent do overlay para a região da grelha (mais robusto).
     bool BeginRegionAttach()
     {
         if (!GridRegion) return false;
@@ -340,6 +343,7 @@ public class AnimalWinVFX : MonoBehaviour
         return true;
     }
 
+    // Restaura o parent/anchors originais após o vídeo terminar.
     void EndRegionAttach()
     {
         var rt = (RectTransform)transform;
@@ -353,8 +357,8 @@ public class AnimalWinVFX : MonoBehaviour
 
         if (debugLogs) Debug.Log("[AnimalWinVFX] Restaurado parent/anchors originais.", this);
     }
-    // --------------------------------------------
 
+    // Sem reparent: calcula posição/tamanho no espaço do pai para coincidir com a GridRegion.
     void MatchToRegionNow()
     {
         if (!GridRegion || !_parentRT) return;
@@ -370,7 +374,7 @@ public class AnimalWinVFX : MonoBehaviour
         }
 
         Vector3[] wc = new Vector3[4];
-        GridRegion.GetWorldCorners(wc); // 0=BL,2=TR
+        GridRegion.GetWorldCorners(wc);
 
         Vector2 bl, tr;
         RectTransformUtility.ScreenPointToLocalPointInRectangle(
@@ -388,6 +392,7 @@ public class AnimalWinVFX : MonoBehaviour
         rt.anchoredPosition = center;
     }
 
+    // Interpolação suave de alpha no CanvasGroup durante 'dur' (em unscaled time).
     IEnumerator FadeTo(float a, float dur)
     {
         if (!Group) yield break;
@@ -405,6 +410,7 @@ public class AnimalWinVFX : MonoBehaviour
     }
 
 #if UNITY_EDITOR
+    // Atalho de editor para tocar rapidamente o FallbackClip durante o Play Mode.
     [ContextMenu("Test Fallback")]
     void _TestFallback()
     {

@@ -1,3 +1,8 @@
+// GridValidator.cs — Compara o estado atual da grelha com o AnimalPattern ativo.
+// Observa o tabuleiro (hash) e só revalida quando algo muda. Quando casa:
+// pára o timer, aplica recompensa, opcionalmente recolhe peças, limpa preview,
+// VFX de vitória e, no fim, desbloqueia o deck.
+
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -41,7 +46,8 @@ public class GridValidator : MonoBehaviour
     string _ultimoHash = null;
     bool _resetAgendado = false;
 
-    // Chama isto quando a carta entra em preview
+    // Define o padrão que deve ser validado. Força revalidação imediata (hash reset).
+    // Útil para logging de flags do pattern no momento em que fica ativo.
     public void DefinirPadraoAtivo(AnimalPattern ap)
     {
         _ativo = ap;
@@ -53,6 +59,7 @@ public class GridValidator : MonoBehaviour
         }
     }
 
+    // Tentativa de auto-wiring: procurar GridRoot (via células) e Deck caso não estejam atribuídos.
     void Awake()
     {
         // tentar descobrir GridRoot automaticamente
@@ -79,6 +86,7 @@ public class GridValidator : MonoBehaviour
         }
     }
 
+    // Observa alterações de estado do tabuleiro por um hash simples e dispara validação quando muda.
     void LateUpdate()
     {
         // revalida apenas quando o "estado" do tabuleiro mudar
@@ -90,6 +98,7 @@ public class GridValidator : MonoBehaviour
         }
     }
 
+    // Núcleo da verificação: recolhe peças colocadas, verifica contagem e tenta casar contra o pattern.
     void Validar()
     {
         if (_ativo == null) { Sinalizar(false, false); return; }
@@ -111,6 +120,8 @@ public class GridValidator : MonoBehaviour
         Sinalizar(match, true);
     }
 
+    // Atualiza flags públicas e desencadeia efeitos colaterais:
+    // callback no Deck, parar timer + recompensa, e agendar ciclo de recolha/VFX.
     void Sinalizar(bool valido, bool completo)
     {
         if (EstadoValido == valido && EstadoCompleto == completo) return;
@@ -139,6 +150,8 @@ public class GridValidator : MonoBehaviour
         }
     }
 
+    // Fluxo pós-acerto: atraso opcional, recolha animada, limpeza do preview, VFX de vitória,
+    // desbloqueio do deck e revalidação final para estabilizar o estado.
     IEnumerator CoRecolherAposAcerto()
     {
         if (AtrasoRecolha <= 0f) yield return null;
@@ -182,6 +195,8 @@ public class GridValidator : MonoBehaviour
 #endif
     }
 
+    // Percorre as células e extrai as peças colocadas, com rotação e estado Eye deduzido.
+    // Mantém apenas o essencial para comparar com o pattern ativo.
     List<Colocada> ColherPecasColocadas()
     {
         var outList = new List<Colocada>();
@@ -239,6 +254,8 @@ public class GridValidator : MonoBehaviour
         return outList;
     }
 
+    // Compara as peças colocadas contra o pattern, suportando rotações globais e duas convenções
+    // (Math CCW / UI CW). Implementa as regras de rotação, Eye/NoEye e “meia-volta” quando permitido.
     bool TentaCasar(List<Colocada> colocadas, AnimalPattern ap, bool exigirRotacao, out string dbg)
     {
         dbg = "";
@@ -318,7 +335,7 @@ public class GridValidator : MonoBehaviour
                     // Rotação por tile
                     if (exigirRotacao)
                     {
-                        // *** ALTERAÇÃO: ignorar SEMPRE a rotação na célula Eye ***
+                        // *** IGNORA rotação na célula Eye ***
                         bool ignorarRotCelulaEye = (exp.eye == EyeRequirement.Eye);
                         if (!ignorarRotCelulaEye)
                         {
@@ -367,6 +384,7 @@ public class GridValidator : MonoBehaviour
         return false;
     }
 
+    // Normaliza graus para múltiplos de 90° em [0, 360).
     static int NormRot(float graus)
     {
         int g = Mathf.RoundToInt(graus) % 360; if (g < 0) g += 360;
@@ -374,6 +392,7 @@ public class GridValidator : MonoBehaviour
         return (q % 360 + 360) % 360;
     }
 
+    // Rotação “matemática” (CCW): útil quando o pattern foi construído nessa convenção.
     static Vector2Int RotacionarMath(Vector2Int v, int graus)
     {
         switch (((graus % 360) + 360) % 360)
@@ -386,6 +405,7 @@ public class GridValidator : MonoBehaviour
         }
     }
 
+    // Rotação “UI” (CW): reflete o senso comum na UI (eixo Y para baixo).
     static Vector2Int RotacionarUI(Vector2Int v, int graus)
     {
         switch (((graus % 360) + 360) % 360)
@@ -398,6 +418,8 @@ public class GridValidator : MonoBehaviour
         }
     }
 
+    // Gera um hash textual do estado atual do tabuleiro (pos/rot/eye) + pattern ativo.
+    // Ajuda a evitar validações redundantes em cada frame.
     string HashDoTabuleiro()
     {
         var list = ColherPecasColocadas()
@@ -408,6 +430,7 @@ public class GridValidator : MonoBehaviour
     }
 
     // ---- recolha animada para a mão ----
+    // Faz animação sequencial de regresso à mão (curta o suficiente para 4 peças).
     public IEnumerator RecolherTodasPecasParaMaoAnimado(float dur)
     {
         if (!GridRoot) yield break;
@@ -426,7 +449,7 @@ public class GridValidator : MonoBehaviour
         }
     }
 
-    // Versão instantânea (não usada agora, mas fica aqui)
+    // Versão instantânea: retorna as peças para a mão sem animação.
     public void RecolherTodasPecasParaMao()
     {
         if (!GridRoot) return;
