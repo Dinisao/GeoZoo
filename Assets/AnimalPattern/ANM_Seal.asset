@@ -20,7 +20,7 @@ MonoBehaviour:
   cellsRotations: 5a000000b400000000000000
   cellsEyeReq: 000000000000000001000000
   ExigirRotacao: 1
-  PermitirRotacoesGlobais: 0
+  PermitirRotacoesGlobais: 1
   PermitirFlipH: 0
   PermitirFlipV: 0
   IgnorarRotacaoNaCelulaEye: 0

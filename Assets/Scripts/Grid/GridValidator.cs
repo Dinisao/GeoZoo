@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using UnityEngine.UI; // <- necessário para 'Image'
 
 /// Valida o layout atual da grelha contra o AnimalPattern ativo.
 /// Regras de Eye:
@@ -13,6 +14,9 @@ public class GridValidator : MonoBehaviour
     [Header("Referências")]
     public RectTransform GridRoot;     // Parent das células (cada filho tem CelulaGrelha)
     public DeckController Deck;        // Referência ao Deck (opcional mas recomendado)
+
+    [Header("FX de Vitória")]
+    public AnimalWinVFX VitoriaFX;
 
     [Header("QoL")]
     [Tooltip("Quando o padrão estiver completo e válido, recolhe as peças automaticamente para a mão.")]
@@ -30,8 +34,8 @@ public class GridValidator : MonoBehaviour
     [Header("Debug")]
     public bool debugLogs = true;
 
-    public bool EstadoValido  { get; private set; }
-    public bool EstadoCompleto{ get; private set; }
+    public bool EstadoValido   { get; private set; }
+    public bool EstadoCompleto { get; private set; }
 
     AnimalPattern _ativo;
     string _ultimoHash = null;
@@ -43,7 +47,10 @@ public class GridValidator : MonoBehaviour
         _ativo = ap;
         _ultimoHash = null; // força revalidar já
         if (debugLogs && _ativo)
+        {
             Debug.Log($"[GridValidator] Pattern ativo: {_ativo.name} (tiles={_ativo.cellsRelatives?.Count ?? 0})", this);
+            Debug.Log($"[GridValidator] Flags: RotGlob={_ativo.PermitirRotacoesGlobais}, ExigirRot={_ativo.ExigirRotacao}, IgnorarRotEye={_ativo.IgnorarRotacaoNaCelulaEye}, MeiaVolta={_ativo.AceitarMeiaVolta}", this);
+        }
     }
 
     void Awake()
@@ -123,10 +130,7 @@ public class GridValidator : MonoBehaviour
             ControladorJogo.Instancia?.PararTimer();
             ControladorJogo.Instancia?.RecompensaAcerto();
 
-            // ❷ bloquear interação dos tiles até à próxima carta
-            ControladorJogo.Instancia?.DefinirInteracaoTiles(false);
-
-            // ❸ iniciar ciclo de recolha/limpeza se ainda não em curso
+            // ❷ iniciar ciclo de recolha/limpeza se ainda não em curso
             if (RecolherAoAcertar && !_resetAgendado)
             {
                 _resetAgendado = true;
@@ -151,7 +155,13 @@ public class GridValidator : MonoBehaviour
             yield return new WaitForSeconds(0.26f);
         }
 
-        // Deck pronto para nova compra
+        // ❸ Tocar vídeo de vitória (se existir). Timer fica parado durante o vídeo.
+        if (VitoriaFX != null)
+        {
+            yield return VitoriaFX.PlayForRoutine(_ativo);
+        }
+
+        // ❹ Deck pronto para nova compra
         if (Deck != null) Deck.DesbloquearDeck();
 
         // força revalidação “limpa”
@@ -164,11 +174,11 @@ public class GridValidator : MonoBehaviour
 
     struct Colocada
     {
-        public Vector2Int cell;   // coords da célula (índice da grelha)
+        public Vector2Int cell;   // coords da célula (índice da grelha, normalizada mais à frente)
         public int rot;           // 0/90/180/270 (normalizado)
         public EyeRequirement eye;// None/Eye/NoEye
 #if UNITY_EDITOR
-        public string debug;      // info extra (frente/verso, tile nº)
+        public string debug;      // info extra (frente/verso)
 #endif
     }
 
@@ -184,6 +194,7 @@ public class GridValidator : MonoBehaviour
             var cel = cellRT.GetComponent<CelulaGrelha>();
             if (!cel) continue;
 
+            // Pega a peça (pode estar como filho em profundidade)
             Peca peca = null;
             for (int j = 0; j < cellRT.childCount; j++)
             {
@@ -192,56 +203,33 @@ public class GridValidator : MonoBehaviour
             }
             if (!peca) continue;
 
+            // Rotação da peça (RectTransform)
             var rt = peca.transform as RectTransform;
             int rot = NormRot(rt ? rt.localEulerAngles.z : 0f);
 
-            // ---- LÓGICA DO EYE ----
+            // Determinar Eye (frente/verso)
             var flip = peca.GetComponent<PecaFlip>();
             EyeRequirement eye = EyeRequirement.None;
-            string dbg = "";
-            if (flip)
+            string dbg = "FRENTE";
+            if (flip != null)
             {
-                if (flip.EstaNaFrente)
-                {
-                    eye = EyeRequirement.None;
-#if UNITY_EDITOR
-                    dbg = "FRENTE";
-#endif
-                }
-                else
+                if (!flip.EstaNaFrente)
                 {
                     string fname = flip.Frente ? flip.Frente.name : "";
                     int lastDigit = -1;
                     for (int k = fname.Length - 1; k >= 0; k--)
                         if (char.IsDigit(fname[k])) { lastDigit = fname[k] - '0'; break; }
 
-                    if (lastDigit == 1 || lastDigit == 2)
-                    {
-                        eye = EyeRequirement.Eye;
-#if UNITY_EDITOR
-                        dbg = $"VERSO(F{lastDigit}=Eye)";
-#endif
-                    }
-                    else if (lastDigit == 3 || lastDigit == 4)
-                    {
-                        eye = EyeRequirement.NoEye;
-#if UNITY_EDITOR
-                        dbg = $"VERSO(F{lastDigit}=NoEye)";
-#endif
-                    }
-                    else
-                    {
-                        eye = EyeRequirement.NoEye; // fallback conservador
-#if UNITY_EDITOR
-                        dbg = $"VERSO(F?=NoEye)";
-#endif
-                    }
+                    if (lastDigit == 1 || lastDigit == 2) { eye = EyeRequirement.Eye;   dbg = "VERSO(F→Eye)"; }
+                    else if (lastDigit == 3 || lastDigit == 4){ eye = EyeRequirement.NoEye; dbg = "VERSO(F→NoEye)"; }
+                    else { eye = EyeRequirement.NoEye; dbg = "VERSO(F?=NoEye)"; }
                 }
             }
-            // ------------------------
 
             outList.Add(new Colocada {
-                cell = cel.Index, rot = rot, eye = eye
+                cell = cel.Index,
+                rot  = rot,
+                eye  = eye
 #if UNITY_EDITOR
                 , debug = dbg
 #endif
@@ -258,28 +246,41 @@ public class GridValidator : MonoBehaviour
         // Normalizar posições para (0,0) no topo-esquerdo do conjunto
         int minX = colocadas.Min(c => c.cell.x);
         int minY = colocadas.Min(c => c.cell.y);
-
         var colocadasNorm = colocadas
-            .Select(c => new Colocada { cell = new Vector2Int(c.cell.x - minX, c.cell.y - minY), rot = c.rot, eye = c.eye
+            .Select(c => new Colocada {
+                cell = new Vector2Int(c.cell.x - minX, c.cell.y - minY),
+                rot  = c.rot,
+                eye  = c.eye
 #if UNITY_EDITOR
-                    , debug = c.debug
+                , debug = c.debug
 #endif
             })
             .OrderBy(c => c.cell.y).ThenBy(c => c.cell.x)
             .ToList();
 
-        // Opções de rotação global de acordo com o pattern
-        var rOptions = ap.PermitirRotacoesGlobais ? new[] { 0, 90, 180, 270 } : new[] { 0 };
+        // Constrói "expected" a partir do pattern base
+        var rel  = ap.cellsRelatives ?? new List<Vector2Int>();
+        var rots = ap.cellsRotations ?? new List<int>();
+        var eyes = ap.cellsEyeReq    ?? new List<EyeRequirement>();
 
-        // Testa com duas convenções (Math e "UI")
-        var rotFns = new System.Func<Vector2Int, int, Vector2Int>[] { RotacionarMath, RotacionarUI };
-
-        foreach (var rotFn in rotFns)
+        var expectedBase = new List<(Vector2Int pos, int rot, EyeRequirement eye)>();
+        for (int i = 0; i < rel.Count; i++)
         {
-            foreach (int rGlobal in rOptions)
+            var pos = rel[i];
+            int rot = (i < rots.Count ? NormRot(rots[i]) : 0);
+            var eye = (i < eyes.Count ? eyes[i] : EyeRequirement.None);
+            expectedBase.Add((pos, rot, eye));
+        }
+
+        // Tentar casar com rotações globais (0/90/180/270) se permitido
+        var rotacoesGlobais = ap.PermitirRotacoesGlobais ? new[] {0,90,180,270} : new[] {0};
+        foreach (int rGlobal in rotacoesGlobais)
+        {
+            // Permitir duas convenções de rotação (Math vs UI), consoante onde o pattern foi criado
+            foreach (var rotFn in new System.Func<Vector2Int,int,Vector2Int>[] { RotacionarMath, RotacionarUI })
             {
-                // Rotaciona todas as posições esperadas
-                var expCells = ap.cellsRelatives.Select(v => rotFn(v, rGlobal)).ToList();
+                // Pos esperadas com rGlobal aplicado
+                var expCells = expectedBase.Select(e => rotFn(e.pos, rGlobal)).ToList();
 
                 // Normaliza expCells para (0,0)
                 int eMinX = expCells.Min(v => v.x);
@@ -287,24 +288,26 @@ public class GridValidator : MonoBehaviour
                 for (int i = 0; i < expCells.Count; i++)
                     expCells[i] = new Vector2Int(expCells[i].x - eMinX, expCells[i].y - eMinY);
 
-                // Rotações esperadas (com rGlobal aplicado)
-                var expRots = new List<int>();
-                for (int i = 0; i < ap.cellsRelatives.Count; i++)
+                // Rotações esperadas (nota: base está em convenção Math/CCW)
+                var expRots = new List<int>(expectedBase.Count);
+                for (int i = 0; i < expectedBase.Count; i++)
                 {
-                    int baseRot = (ap.cellsRotations != null && i < ap.cellsRotations.Count) ? ap.cellsRotations[i] : 0;
-                    expRots.Add(NormRot(baseRot + rGlobal));
+                    int baseRotMath = expectedBase[i].rot;
+                    // Se rodámos as POSIÇÕES em UI (CW), o equivalente para rotação local é subtrair rGlobal.
+                    int apply = (rotFn == RotacionarUI) ? NormRot(baseRotMath - rGlobal) : NormRot(baseRotMath + rGlobal);
+                    expRots.Add(apply);
                 }
 
-                // Eye esperado (preenche faltas como None = "não-Eye")
-                var expEyes = ap.cellsEyeReq ?? new List<EyeRequirement>();
-                while (expEyes.Count < ap.cellsRelatives.Count) expEyes.Add(EyeRequirement.None);
+                var expEyes = expectedBase.Select(e => e.eye).ToList();
 
-                var expected = Enumerable.Range(0, ap.cellsRelatives.Count)
+                var expected = Enumerable.Range(0, expectedBase.Count)
                     .Select(i => new { pos = expCells[i], rot = expRots[i], eye = expEyes[i] })
                     .OrderBy(e => e.pos.y).ThenBy(e => e.pos.x)
                     .ToList();
 
+                if (expected.Count != colocadasNorm.Count) continue;
                 bool ok = true;
+
                 for (int i = 0; i < expected.Count; i++)
                 {
                     var got = colocadasNorm[i];
@@ -315,8 +318,8 @@ public class GridValidator : MonoBehaviour
                     // Rotação por tile
                     if (exigirRotacao)
                     {
-                        // Ignorar rotação apenas na célula Eye se o pattern assim o disser
-                        bool ignorarRotCelulaEye = ap.IgnorarRotacaoNaCelulaEye && exp.eye == EyeRequirement.Eye;
+                        // *** ALTERAÇÃO: ignorar SEMPRE a rotação na célula Eye ***
+                        bool ignorarRotCelulaEye = (exp.eye == EyeRequirement.Eye);
                         if (!ignorarRotCelulaEye)
                         {
                             int gr = NormRot(got.rot);
@@ -409,7 +412,7 @@ public class GridValidator : MonoBehaviour
     {
         if (!GridRoot) yield break;
 
-        // Faz sequencialmente (4 peças -> ok). Se quiseres paralelo, digo-te já como.
+        // Faz sequencialmente (4 peças -> ok). Se quiseres paralelo, diz-me.
         for (int i = 0; i < GridRoot.childCount; i++)
         {
             var cellRT = GridRoot.GetChild(i) as RectTransform;
@@ -423,7 +426,7 @@ public class GridValidator : MonoBehaviour
         }
     }
 
-    // Versão instantânea (não usada agora, fica para utilidade)
+    // Versão instantânea (não usada agora, mas fica aqui)
     public void RecolherTodasPecasParaMao()
     {
         if (!GridRoot) return;
