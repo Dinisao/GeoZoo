@@ -10,15 +10,15 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: d8cf6e79c9100fa49b5ff6e253477d3f, type: 3}
-  m_Name: ANM_Elephant
+  m_Name: ANM_Peacock
   m_EditorClassIdentifier: Assembly-CSharp::AnimalPattern
-  CardSprite: {fileID: 21300000, guid: e05cf783c3ca65f46a5f196b0e0d0474, type: 3}
+  CardSprite: {fileID: 21300000, guid: bb2132bf6b6c9994092ea370f285f61c, type: 3}
   cellsRelatives:
   - {x: 0, y: 0}
   - {x: 1, y: 0}
   - {x: 0, y: 1}
   - {x: 1, y: 1}
-  cellsRotations: 00000000000000000e010000b4000000
+  cellsRotations: 0000000000000000b40000000e010000
   cellsEyeReq: 00000000010000000000000000000000
   ExigirRotacao: 1
   PermitirRotacoesGlobais: 1

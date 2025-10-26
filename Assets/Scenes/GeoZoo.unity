@@ -1293,6 +1293,30 @@ MonoBehaviour:
   imgPreview: {fileID: 0}
   animator: {fileID: 1387990329}
   Cartas:
+  - Id: Dog
+    Frente: {fileID: 21300000, guid: b13c631141e72b143bb7177ac2fe4fe5, type: 3}
+    Verso: {fileID: 21300000, guid: f1a5a4c8a0ca6224cb04d01754311250, type: 3}
+  - Id: Cat
+    Frente: {fileID: 21300000, guid: 61f971d371efb7f47b258587b703a3d0, type: 3}
+    Verso: {fileID: 21300000, guid: f1a5a4c8a0ca6224cb04d01754311250, type: 3}
+  - Id: Bee
+    Frente: {fileID: 21300000, guid: 956bae5fa8131d64bbc9d53d46a40d18, type: 3}
+    Verso: {fileID: 21300000, guid: f1a5a4c8a0ca6224cb04d01754311250, type: 3}
+  - Id: Fish
+    Frente: {fileID: 21300000, guid: 89bdfb230ae2c654482fed57697c97d9, type: 3}
+    Verso: {fileID: 21300000, guid: f1a5a4c8a0ca6224cb04d01754311250, type: 3}
+  - Id: Fox
+    Frente: {fileID: 21300000, guid: 009a1aa57bc5038478210e6c320b7408, type: 3}
+    Verso: {fileID: 21300000, guid: f1a5a4c8a0ca6224cb04d01754311250, type: 3}
+  - Id: Hedgehog
+    Frente: {fileID: 21300000, guid: adce378389cd79f458bf9e987d08234d, type: 3}
+    Verso: {fileID: 21300000, guid: f1a5a4c8a0ca6224cb04d01754311250, type: 3}
+  - Id: Peacock
+    Frente: {fileID: 21300000, guid: bb2132bf6b6c9994092ea370f285f61c, type: 3}
+    Verso: {fileID: 21300000, guid: f1a5a4c8a0ca6224cb04d01754311250, type: 3}
+  - Id: Eagle
+    Frente: {fileID: 21300000, guid: 6d86cddef38e5bd4fa02d5d94da5f288, type: 3}
+    Verso: {fileID: 21300000, guid: f1a5a4c8a0ca6224cb04d01754311250, type: 3}
   - Id: Lobster
     Frente: {fileID: 21300000, guid: 9c2a918bd06591a46a40a5b6421d5d40, type: 3}
     Verso: {fileID: 21300000, guid: f1a5a4c8a0ca6224cb04d01754311250, type: 3}
@@ -1305,9 +1329,6 @@ MonoBehaviour:
   - Id: Rhino
     Frente: {fileID: 21300000, guid: dba504518adbc6c44a70d8457aea8816, type: 3}
     Verso: {fileID: 21300000, guid: f1a5a4c8a0ca6224cb04d01754311250, type: 3}
-  - Id: Fox
-    Frente: {fileID: 21300000, guid: 009a1aa57bc5038478210e6c320b7408, type: 3}
-    Verso: {fileID: 21300000, guid: f1a5a4c8a0ca6224cb04d01754311250, type: 3}
   - Id: Squirrel
     Frente: {fileID: 21300000, guid: e674e1706981ea9488f3fe7ca4c9db95, type: 3}
     Verso: {fileID: 21300000, guid: f1a5a4c8a0ca6224cb04d01754311250, type: 3}
@@ -1316,9 +1337,6 @@ MonoBehaviour:
     Verso: {fileID: 21300000, guid: f1a5a4c8a0ca6224cb04d01754311250, type: 3}
   - Id: Mole
     Frente: {fileID: 21300000, guid: d2cb4ae1732e333428d2808852b58133, type: 3}
-    Verso: {fileID: 21300000, guid: f1a5a4c8a0ca6224cb04d01754311250, type: 3}
-  - Id: Elephant
-    Frente: {fileID: 21300000, guid: e05cf783c3ca65f46a5f196b0e0d0474, type: 3}
     Verso: {fileID: 21300000, guid: f1a5a4c8a0ca6224cb04d01754311250, type: 3}
   - Id: Pelican
     Frente: {fileID: 21300000, guid: 0f3e6ad2c49ba414186ff0d93d4f17df, type: 3}
@@ -1350,9 +1368,6 @@ MonoBehaviour:
   - Id: Snake
     Frente: {fileID: 21300000, guid: 2e00e91924ba2734f9dd519681a14881, type: 3}
     Verso: {fileID: 21300000, guid: f1a5a4c8a0ca6224cb04d01754311250, type: 3}
-  - Id: Bee
-    Frente: {fileID: 21300000, guid: 956bae5fa8131d64bbc9d53d46a40d18, type: 3}
-    Verso: {fileID: 21300000, guid: f1a5a4c8a0ca6224cb04d01754311250, type: 3}
   - Id: Turtle
     Frente: {fileID: 21300000, guid: 986057ab26e3391429a733dae068b955, type: 3}
     Verso: {fileID: 21300000, guid: f1a5a4c8a0ca6224cb04d01754311250, type: 3}
@@ -1362,14 +1377,14 @@ MonoBehaviour:
   - Id: Frog
     Frente: {fileID: 21300000, guid: 70ec7d87086bd934a840f26e4674d442, type: 3}
     Verso: {fileID: 21300000, guid: f1a5a4c8a0ca6224cb04d01754311250, type: 3}
-  - Id: Dog
-    Frente: {fileID: 21300000, guid: b13c631141e72b143bb7177ac2fe4fe5, type: 3}
-    Verso: {fileID: 21300000, guid: f1a5a4c8a0ca6224cb04d01754311250, type: 3}
   - Id: Chameleon
     Frente: {fileID: 21300000, guid: cd6668bb6ddbce847b5042047dbc78a1, type: 3}
     Verso: {fileID: 21300000, guid: f1a5a4c8a0ca6224cb04d01754311250, type: 3}
   - Id: Ladybug
     Frente: {fileID: 21300000, guid: 5efe8547ecda6134295dfccff826b4ad, type: 3}
+    Verso: {fileID: 21300000, guid: f1a5a4c8a0ca6224cb04d01754311250, type: 3}
+  - Id: Armadillo
+    Frente: {fileID: 21300000, guid: 85165e9cae64bb3429b8535d1b9e344e, type: 3}
     Verso: {fileID: 21300000, guid: f1a5a4c8a0ca6224cb04d01754311250, type: 3}
   aleatorio: 0
   debugLogs: 1
@@ -1393,7 +1408,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 4272f680cf671444a9976f5a12fb99ae, type: 2}
   - {fileID: 11400000, guid: 453bc35447531654faf19a8d83734ac4, type: 2}
   - {fileID: 11400000, guid: 7ad0bac87224fdd4bb49c96db3fcce8f, type: 2}
-  - {fileID: 11400000, guid: cb751ecff57afe1479d2a51390f9acbb, type: 2}
+  - {fileID: 11400000, guid: 07220951b66423247be63d4c4f91257b, type: 2}
   - {fileID: 11400000, guid: 8d2fe37d24da131439bcba5ee304be7c, type: 2}
   - {fileID: 11400000, guid: b0a33f193f8a3da4bac1a2b056ff0b1b, type: 2}
   - {fileID: 11400000, guid: 99fc1d6e6241e38478eff549be4051e8, type: 2}
@@ -1412,6 +1427,11 @@ MonoBehaviour:
   - {fileID: 11400000, guid: c52db7d6274aa3c47bca04c97003a124, type: 2}
   - {fileID: 11400000, guid: dba743d5540978a48b65ff5ebd6e1fce, type: 2}
   - {fileID: 11400000, guid: 4ef3e9c38866cf84cbb3d16c8cc97458, type: 2}
+  - {fileID: 11400000, guid: 77384a250a989d94da3f1f1d4699ffe8, type: 2}
+  - {fileID: 11400000, guid: f7b0666f88732bc4ab070a65550a1950, type: 2}
+  - {fileID: 11400000, guid: 1a6cb2ad6cf274744be06584b443b1f7, type: 2}
+  - {fileID: 11400000, guid: 60ed2bcd0c559f14bb3724d1e739adbf, type: 2}
+  - {fileID: 11400000, guid: 478401ab4c036224b8cec2b34b43da0c, type: 2}
 --- !u!114 &1387990327
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1658,8 +1678,22 @@ MonoBehaviour:
   Entries:
   - CardSprite: {fileID: 21300000, guid: b13c631141e72b143bb7177ac2fe4fe5, type: 3}
     Clip: {fileID: 32900000, guid: c490741bd9110cf4785684efdb24d4f9, type: 3}
-  - CardSprite: {fileID: 21300000, guid: 9c2a918bd06591a46a40a5b6421d5d40, type: 3}
+  - CardSprite: {fileID: 21300000, guid: 61f971d371efb7f47b258587b703a3d0, type: 3}
     Clip: {fileID: 32900000, guid: cc279ffff98420e48b77c7e65512f6e5, type: 3}
+  - CardSprite: {fileID: 21300000, guid: 956bae5fa8131d64bbc9d53d46a40d18, type: 3}
+    Clip: {fileID: 32900000, guid: 86fdbacc5ebe6534f966e9ea3727fa60, type: 3}
+  - CardSprite: {fileID: 21300000, guid: 89bdfb230ae2c654482fed57697c97d9, type: 3}
+    Clip: {fileID: 32900000, guid: 303d2466338cd4240a17ea93adf8e222, type: 3}
+  - CardSprite: {fileID: 21300000, guid: 009a1aa57bc5038478210e6c320b7408, type: 3}
+    Clip: {fileID: 32900000, guid: 76cd01eb37e8b164789debf670cf0b97, type: 3}
+  - CardSprite: {fileID: 21300000, guid: adce378389cd79f458bf9e987d08234d, type: 3}
+    Clip: {fileID: 32900000, guid: 81ad8f68e9d4f6742962dabb087be577, type: 3}
+  - CardSprite: {fileID: 21300000, guid: bb2132bf6b6c9994092ea370f285f61c, type: 3}
+    Clip: {fileID: 32900000, guid: 9de4daf672a8b6c4a978efb1ee81439e, type: 3}
+  - CardSprite: {fileID: 21300000, guid: bb2132bf6b6c9994092ea370f285f61c, type: 3}
+    Clip: {fileID: 32900000, guid: 9de4daf672a8b6c4a978efb1ee81439e, type: 3}
+  - CardSprite: {fileID: 21300000, guid: 6d86cddef38e5bd4fa02d5d94da5f288, type: 3}
+    Clip: {fileID: 32900000, guid: 5b3b751afcbad7e42ac1b472ba89d454, type: 3}
   Deck: {fileID: 0}
   Target: {fileID: 1818166873}
   Group: {fileID: 1818166872}
