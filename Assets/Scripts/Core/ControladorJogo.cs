@@ -102,7 +102,7 @@ public class ControladorJogo : MonoBehaviour
     void AtualizarHUD()
     {
         if (TxtZoo)   TxtZoo.text   = $"ZOO: {_zoo}";
-        if (TxtTempo) TxtTempo.text = $"TIME: {Formatar(_tempoRestante)}";
+        if (TxtTempo) TxtTempo.text = $"{Formatar(_tempoRestante)}";
     }
 
     // Converte segundos em "m:ss".
