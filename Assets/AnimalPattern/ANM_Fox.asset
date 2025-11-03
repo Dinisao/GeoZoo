@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d8cf6e79c9100fa49b5ff6e253477d3f, type: 3}
   m_Name: ANM_Fox
   m_EditorClassIdentifier: Assembly-CSharp::AnimalPattern
-  CardSprite: {fileID: 21300000, guid: 009a1aa57bc5038478210e6c320b7408, type: 3}
+  CardSprite: {fileID: 21300000, guid: 0096e9ca13f9e234587492ca47881f10, type: 3}
   cellsRelatives:
   - {x: 0, y: 0}
   - {x: 1, y: 0}

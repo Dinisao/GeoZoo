@@ -1952,19 +1952,19 @@ MonoBehaviour:
   animator: {fileID: 1387990329}
   Cartas:
   - Id: Dog
-    Frente: {fileID: 21300000, guid: b13c631141e72b143bb7177ac2fe4fe5, type: 3}
+    Frente: {fileID: 21300000, guid: e9657601fa5136c44af720714493ce73, type: 3}
     Verso: {fileID: 21300000, guid: f1a5a4c8a0ca6224cb04d01754311250, type: 3}
   - Id: Cat
     Frente: {fileID: 21300000, guid: 61f971d371efb7f47b258587b703a3d0, type: 3}
     Verso: {fileID: 21300000, guid: f1a5a4c8a0ca6224cb04d01754311250, type: 3}
   - Id: Bee
-    Frente: {fileID: 21300000, guid: 956bae5fa8131d64bbc9d53d46a40d18, type: 3}
+    Frente: {fileID: 21300000, guid: 15ca115737726de45b58751b3d794485, type: 3}
     Verso: {fileID: 21300000, guid: f1a5a4c8a0ca6224cb04d01754311250, type: 3}
   - Id: Fish
     Frente: {fileID: 21300000, guid: 89bdfb230ae2c654482fed57697c97d9, type: 3}
     Verso: {fileID: 21300000, guid: f1a5a4c8a0ca6224cb04d01754311250, type: 3}
   - Id: Fox
-    Frente: {fileID: 21300000, guid: 009a1aa57bc5038478210e6c320b7408, type: 3}
+    Frente: {fileID: 21300000, guid: 0096e9ca13f9e234587492ca47881f10, type: 3}
     Verso: {fileID: 21300000, guid: f1a5a4c8a0ca6224cb04d01754311250, type: 3}
   - Id: Hedgehog
     Frente: {fileID: 21300000, guid: adce378389cd79f458bf9e987d08234d, type: 3}
@@ -1979,67 +1979,67 @@ MonoBehaviour:
     Frente: {fileID: 21300000, guid: 24b4901860e469842bb07d1e3ebc63c0, type: 3}
     Verso: {fileID: 21300000, guid: f1a5a4c8a0ca6224cb04d01754311250, type: 3}
   - Id: Lobster
-    Frente: {fileID: 21300000, guid: 9c2a918bd06591a46a40a5b6421d5d40, type: 3}
+    Frente: {fileID: 21300000, guid: fa8ed9fa6bc088d42b45c3807cf6394f, type: 3}
     Verso: {fileID: 21300000, guid: f1a5a4c8a0ca6224cb04d01754311250, type: 3}
   - Id: Seal
-    Frente: {fileID: 21300000, guid: 4d386a4915d8a804981b24cbded18feb, type: 3}
+    Frente: {fileID: 21300000, guid: 337b8ce1502f34940a44b4f547bde3ca, type: 3}
     Verso: {fileID: 21300000, guid: f1a5a4c8a0ca6224cb04d01754311250, type: 3}
   - Id: Bear
-    Frente: {fileID: 21300000, guid: 9f145a7c247b4fd40b32b9f7541f720d, type: 3}
+    Frente: {fileID: 21300000, guid: aa9cd678d49230b428a114e551093324, type: 3}
     Verso: {fileID: 21300000, guid: f1a5a4c8a0ca6224cb04d01754311250, type: 3}
   - Id: Rhino
-    Frente: {fileID: 21300000, guid: dba504518adbc6c44a70d8457aea8816, type: 3}
+    Frente: {fileID: 21300000, guid: 1ce2c42942a55784c8564c29638f021b, type: 3}
     Verso: {fileID: 21300000, guid: f1a5a4c8a0ca6224cb04d01754311250, type: 3}
   - Id: Squirrel
-    Frente: {fileID: 21300000, guid: e674e1706981ea9488f3fe7ca4c9db95, type: 3}
+    Frente: {fileID: 21300000, guid: 2459cf0cb3e835a4eaa7dfb9ebeedefd, type: 3}
     Verso: {fileID: 21300000, guid: f1a5a4c8a0ca6224cb04d01754311250, type: 3}
   - Id: Worm
-    Frente: {fileID: 21300000, guid: 0e054e0e21da58b4d90eeb275c8ba459, type: 3}
+    Frente: {fileID: 21300000, guid: 6bb6cf7d77f285545a8e568f665c999a, type: 3}
     Verso: {fileID: 21300000, guid: f1a5a4c8a0ca6224cb04d01754311250, type: 3}
   - Id: Mole
-    Frente: {fileID: 21300000, guid: d2cb4ae1732e333428d2808852b58133, type: 3}
+    Frente: {fileID: 21300000, guid: 55bca4bd1c12733458c47c6c9507168b, type: 3}
     Verso: {fileID: 21300000, guid: f1a5a4c8a0ca6224cb04d01754311250, type: 3}
   - Id: Pelican
-    Frente: {fileID: 21300000, guid: 0f3e6ad2c49ba414186ff0d93d4f17df, type: 3}
+    Frente: {fileID: 21300000, guid: 38068d5037b2c5449a9e32b552f7143e, type: 3}
     Verso: {fileID: 21300000, guid: f1a5a4c8a0ca6224cb04d01754311250, type: 3}
   - Id: Parrot
-    Frente: {fileID: 21300000, guid: 488ce15bd19ebcf46bf373ddf7c0760c, type: 3}
+    Frente: {fileID: 21300000, guid: 381bac9ef79349c40b4049de2b32ca27, type: 3}
     Verso: {fileID: 21300000, guid: f1a5a4c8a0ca6224cb04d01754311250, type: 3}
   - Id: Shrimp
-    Frente: {fileID: 21300000, guid: bd149fda7e5f9324aa464c68977e0d32, type: 3}
+    Frente: {fileID: 21300000, guid: 87b24b275233d914db4097ed29df9dff, type: 3}
     Verso: {fileID: 21300000, guid: f1a5a4c8a0ca6224cb04d01754311250, type: 3}
   - Id: Moose
-    Frente: {fileID: 21300000, guid: 9ebb3e117d467ec46972497dc55986a8, type: 3}
+    Frente: {fileID: 21300000, guid: 0c2284d63cd97af44a3cfbfddbc153b9, type: 3}
     Verso: {fileID: 21300000, guid: f1a5a4c8a0ca6224cb04d01754311250, type: 3}
   - Id: Butterfly
-    Frente: {fileID: 21300000, guid: 22a2e72cd1421ce49a6619bd82d400e7, type: 3}
+    Frente: {fileID: 21300000, guid: d5316bfcd7a1b7d428a3f4c629298701, type: 3}
     Verso: {fileID: 21300000, guid: f1a5a4c8a0ca6224cb04d01754311250, type: 3}
   - Id: Toucan
-    Frente: {fileID: 21300000, guid: 40d680e93a7adad48a224c86bc9cbbba, type: 3}
+    Frente: {fileID: 21300000, guid: 200fc559e9391c947bd21ab0ed5ed880, type: 3}
     Verso: {fileID: 21300000, guid: f1a5a4c8a0ca6224cb04d01754311250, type: 3}
   - Id: Duck
-    Frente: {fileID: 21300000, guid: 86977b6e20e7a814c9d3c7890d10fbfc, type: 3}
+    Frente: {fileID: 21300000, guid: 7848bae38ff3ac6468ca6c838c5d52e5, type: 3}
     Verso: {fileID: 21300000, guid: f1a5a4c8a0ca6224cb04d01754311250, type: 3}
   - Id: Penguin
-    Frente: {fileID: 21300000, guid: 9bca47bf55f38034abc896f0afe7f44b, type: 3}
+    Frente: {fileID: 21300000, guid: 6f9e7c014c102f445b192c8fe77940be, type: 3}
     Verso: {fileID: 21300000, guid: f1a5a4c8a0ca6224cb04d01754311250, type: 3}
   - Id: Snake
-    Frente: {fileID: 21300000, guid: 2e00e91924ba2734f9dd519681a14881, type: 3}
+    Frente: {fileID: 21300000, guid: e98178da75f34ca4aa096083a5ccf8ed, type: 3}
     Verso: {fileID: 21300000, guid: f1a5a4c8a0ca6224cb04d01754311250, type: 3}
   - Id: Turtle
-    Frente: {fileID: 21300000, guid: 986057ab26e3391429a733dae068b955, type: 3}
+    Frente: {fileID: 21300000, guid: a9ae5a9e8bd165240b6820823a60095a, type: 3}
     Verso: {fileID: 21300000, guid: f1a5a4c8a0ca6224cb04d01754311250, type: 3}
-  - Id: Crabe
-    Frente: {fileID: 21300000, guid: ac045c6a23ef3fe4fbfaa0a5ada69a2e, type: 3}
+  - Id: Crab
+    Frente: {fileID: 21300000, guid: d1a6c5608eb75cc4e94f31d72ed69afc, type: 3}
     Verso: {fileID: 21300000, guid: f1a5a4c8a0ca6224cb04d01754311250, type: 3}
   - Id: Frog
-    Frente: {fileID: 21300000, guid: 70ec7d87086bd934a840f26e4674d442, type: 3}
+    Frente: {fileID: 21300000, guid: 9f2c73f4a0cee6f4a989a2c627abc5e6, type: 3}
     Verso: {fileID: 21300000, guid: f1a5a4c8a0ca6224cb04d01754311250, type: 3}
   - Id: Chameleon
-    Frente: {fileID: 21300000, guid: cd6668bb6ddbce847b5042047dbc78a1, type: 3}
+    Frente: {fileID: 21300000, guid: 13b681a405ab87749afbfdafad4fa31e, type: 3}
     Verso: {fileID: 21300000, guid: f1a5a4c8a0ca6224cb04d01754311250, type: 3}
   - Id: Ladybug
-    Frente: {fileID: 21300000, guid: 5efe8547ecda6134295dfccff826b4ad, type: 3}
+    Frente: {fileID: 21300000, guid: 39d05b43093f338429157d882a3c91f4, type: 3}
     Verso: {fileID: 21300000, guid: f1a5a4c8a0ca6224cb04d01754311250, type: 3}
   - Id: Armadillo
     Frente: {fileID: 21300000, guid: 85165e9cae64bb3429b8535d1b9e344e, type: 3}
@@ -2074,7 +2074,6 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 7cda64f0304c4944fa4711a282c9ecb9, type: 2}
   - {fileID: 11400000, guid: 7ca41867a108f304699aee688c8af80f, type: 2}
   - {fileID: 11400000, guid: 76e22f716fd9bfd4db061d68c4714a59, type: 2}
-  - {fileID: 11400000, guid: d2ae2b9f4fea30148b5e90c53d0bfe28, type: 2}
   - {fileID: 11400000, guid: 2f8f62ecd70439e4695eecab20075b5c, type: 2}
   - {fileID: 11400000, guid: 6654895b465c68c4d8eb69b525cdc3f9, type: 2}
   - {fileID: 11400000, guid: d3274c51ef64cc5469411a1d0b44eae1, type: 2}
@@ -2090,6 +2089,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 1a6cb2ad6cf274744be06584b443b1f7, type: 2}
   - {fileID: 11400000, guid: 60ed2bcd0c559f14bb3724d1e739adbf, type: 2}
   - {fileID: 11400000, guid: 478401ab4c036224b8cec2b34b43da0c, type: 2}
+  - {fileID: 11400000, guid: d2ae2b9f4fea30148b5e90c53d0bfe28, type: 2}
 --- !u!114 &1387990327
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2782,15 +2782,15 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::AnimalWinVFX
   Entries:
-  - CardSprite: {fileID: 21300000, guid: b13c631141e72b143bb7177ac2fe4fe5, type: 3}
+  - CardSprite: {fileID: 21300000, guid: e9657601fa5136c44af720714493ce73, type: 3}
     Clip: {fileID: 32900000, guid: c490741bd9110cf4785684efdb24d4f9, type: 3}
   - CardSprite: {fileID: 21300000, guid: 61f971d371efb7f47b258587b703a3d0, type: 3}
     Clip: {fileID: 32900000, guid: cc279ffff98420e48b77c7e65512f6e5, type: 3}
-  - CardSprite: {fileID: 21300000, guid: 956bae5fa8131d64bbc9d53d46a40d18, type: 3}
+  - CardSprite: {fileID: 21300000, guid: 15ca115737726de45b58751b3d794485, type: 3}
     Clip: {fileID: 32900000, guid: 86fdbacc5ebe6534f966e9ea3727fa60, type: 3}
   - CardSprite: {fileID: 21300000, guid: 89bdfb230ae2c654482fed57697c97d9, type: 3}
     Clip: {fileID: 32900000, guid: 303d2466338cd4240a17ea93adf8e222, type: 3}
-  - CardSprite: {fileID: 21300000, guid: 009a1aa57bc5038478210e6c320b7408, type: 3}
+  - CardSprite: {fileID: 21300000, guid: 0096e9ca13f9e234587492ca47881f10, type: 3}
     Clip: {fileID: 32900000, guid: 76cd01eb37e8b164789debf670cf0b97, type: 3}
   - CardSprite: {fileID: 21300000, guid: adce378389cd79f458bf9e987d08234d, type: 3}
     Clip: {fileID: 32900000, guid: 81ad8f68e9d4f6742962dabb087be577, type: 3}
