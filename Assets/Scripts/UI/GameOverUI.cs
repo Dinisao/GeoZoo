@@ -1,7 +1,8 @@
-// GameOverUI_Simple — Overlay de Game Over com mensagem dinâmica e fade + escurecer do fundo.
-// • Usa 1 sprite no ImgFundo (a tua "bolha") e muda só o texto conforme o ZOO.
-// • Faz fade-in do overlay e escurece o resto da cena até EscurecerAlvo com curva suave.
-// • Não gere botões: coloca os teus botões como filhos do ImgFundo e usa GameOverButtons.cs para as ações.
+// GameOverUI_Simple — Overlay de Game Over com mensagem dinâmica,
+// fade + escurecer do fundo e entrada do balão com "queda + bounce + wobble".
+//
+// Coloca os botões Retry/Quit como filhos do ImgFundo (imagens sem texto)
+// e usa GameOverButtons.cs para as ações.
 //
 // Requer: TextMeshPro
 
@@ -21,17 +22,17 @@ public class GameOverUI_Simple : MonoBehaviour
     [Header("Overlay")]
     public CanvasGroup Overlay;      // CanvasGroup no próprio UI_GameOver
     public Image FundoEscuro;        // Image preto translúcido que cobre o ecrã
-    [Range(0f,1f)] public float IntensidadeEscuro = 0.60f; // alpha "base" do fundo quando parado
+    [Range(0f,1f)] public float IntensidadeEscuro = 0.60f; // alpha base
 
     [Header("Efeito de Escurecer (fade-in)")]
     public bool AnimarEscurecer = true;
-    [Range(0f,1f)] public float EscurecerAlvo = 0.85f;     // quão escuro fica quando abre
-    public float DurEscurecer = 0.35f;                     // duração do fade
-    public AnimationCurve CurvaEscurecer = null;           // curva do fade (se null, EaseInOut)
+    [Range(0f,1f)] public float EscurecerAlvo = 0.85f;
+    public float DurEscurecer = 0.35f;
+    public AnimationCurve CurvaEscurecer = null;  // se null → EaseInOut
 
     [Header("Balão (fundo principal)")]
     public Image ImgFundo;                 // Image do balão (a tua Imagem 1)
-    public List<Sprite> FundosPorZoo = new(); // Podes deixar Size=1 com o mesmo sprite sempre
+    public List<Sprite> FundosPorZoo = new();
     public bool UsarUltimoSpriteSeUltrapassar = true;
     public bool PreservarAspetoFundo = true;
     public Vector2 TamanhoFundo = new Vector2(980, 640);
@@ -42,7 +43,25 @@ public class GameOverUI_Simple : MonoBehaviour
     public TMP_FontAsset FonteMensagem;    // TMP Font Asset (a tua fonte)
     [Range(18,120)] public int TamanhoFonteMensagem = 44;
     public Color CorMensagem = Color.black;
-    public Vector2 MargemMensagem = new Vector2(60, 80);   // x=horizontal, y=vertical
+    public Vector2 MargemMensagem = new Vector2(60, 80);
+
+    [Header("Entrada do Balão (queda + bounce)")]
+    public bool AnimarEntradaBalao = true;
+    public float DropAltura = 420f;                // px acima do alvo
+    public float DropDuracao = 0.35f;              // tempo da queda
+    public AnimationCurve DropCurva = null;        // se null → EaseIn (mais “gravidade”)
+    [Tooltip("Intensidade do 'esmagar' inicial (0.12 = 12%).")]
+    [Range(0f,0.4f)] public float BounceImpactScale = 0.12f;
+    [Tooltip("Número de bounces após o impacto.")]
+    [Range(0,5)] public int BounceRepeticoes = 2;
+    [Tooltip("Quanto o bounce decai a cada oscilação (0.6 = 60% do anterior).")]
+    [Range(0.3f,0.9f)] public float BounceDamping = 0.65f;
+    public float BounceDuracao = 0.12f;            // duração de cada meia-osc.
+    [Header("Wobble (abanico)")]
+    [Tooltip("Ângulo máximo inicial em graus.")]
+    [Range(0f,15f)] public float WobbleAngulo = 6f;
+    public float WobbleDuracao = 0.9f;
+    [Range(0.3f,1.0f)] public float WobbleDamping = 0.6f;
 
     [Header("Preview (Editor)")]
     public bool PreviewAtivo = false;
@@ -84,7 +103,7 @@ public class GameOverUI_Simple : MonoBehaviour
             go.transform.SetParent(ImgFundo.transform, false);
             TxtMensagem = go.GetComponent<TextMeshProUGUI>();
             TxtMensagem.alignment = TextAlignmentOptions.Center;
-            TxtMensagem.textWrappingMode = TextWrappingModes.Normal; // (sem obsolete)
+            TxtMensagem.textWrappingMode = TextWrappingModes.Normal;
         }
     }
 
@@ -93,6 +112,10 @@ public class GameOverUI_Simple : MonoBehaviour
     {
         if (CurvaEscurecer == null)
             CurvaEscurecer = AnimationCurve.EaseInOut(0, 0, 1, 1);
+        if (DropCurva == null)
+            DropCurva = AnimationCurve.EaseInOut(0, 0, 1, 1); // EaseInOut por default
+        // Uma queda mais “fisica” pode usar EaseInQuad:
+        // DropCurva = new AnimationCurve(new Keyframe(0,0, 0, 2), new Keyframe(1,1));
 
         EnsureRefs(true);
 
@@ -117,7 +140,7 @@ public class GameOverUI_Simple : MonoBehaviour
     {
         TryHookControlador();
 #if UNITY_EDITOR
-        if (!Application.isPlaying && PreviewAtivo) EditorRefresh();
+ if (!Application.isPlaying && PreviewAtivo) EditorRefresh();
 #endif
     }
 
@@ -177,7 +200,10 @@ public class GameOverUI_Simple : MonoBehaviour
         AplicarFundoPorZoo(zoo);
         AtualizarMensagem(zoo);
         SanitizeAllImages();
+
+        // Animações em paralelo
         StartCoroutine(FadeInOverlay());
+        if (AnimarEntradaBalao) StartCoroutine(AnimarEntradaBalaoRoutine());
     }
 
     // ===== Visual/Mensagem =====
@@ -260,10 +286,8 @@ public class GameOverUI_Simple : MonoBehaviour
             t += Time.unscaledDeltaTime;
             float k = CurvaEscurecer.Evaluate(Mathf.Clamp01(t / dur));
 
-            // fade-in geral do overlay (balão + botões + tudo)
             Overlay.alpha = k;
 
-            // escurecer dedicado do fundo
             if (FundoEscuro)
             {
                 var c = FundoEscuro.color;
@@ -280,6 +304,99 @@ public class GameOverUI_Simple : MonoBehaviour
             c.a = alvoEscuro;
             FundoEscuro.color = c;
         }
+    }
+
+    // ===== Entrada do Balão =====
+    IEnumerator AnimarEntradaBalaoRoutine()
+    {
+        if (_fundoRT == null) yield break;
+
+        // guardar alvo e estado inicial
+        Vector2 alvo = _fundoRT.anchoredPosition;
+        Vector3 alvoScale = Vector3.one;
+        float alvoRotZ = 0f;
+
+        // estado de partida (acima e esticado verticalmente)
+        Vector2 startPos = alvo + new Vector2(0f, Mathf.Abs(DropAltura));
+        _fundoRT.anchoredPosition = startPos;
+        _fundoRT.localScale = new Vector3(0.98f, 1.02f, 1f);
+        _fundoRT.localEulerAngles = new Vector3(0, 0, -Mathf.Sign(Random.value - 0.5f) * (WobbleAngulo * 0.6f));
+
+        // QUEDA
+        float t = 0f;
+        float durQueda = Mathf.Max(0.0001f, DropDuracao);
+        while (t < durQueda)
+        {
+            t += Time.unscaledDeltaTime;
+            float k = Mathf.Clamp01(t / durQueda);
+            float e = DropCurva.Evaluate(k);      // easing da queda
+            _fundoRT.anchoredPosition = Vector2.LerpUnclamped(startPos, alvo, e);
+
+            // leve rotação durante a queda
+            float rot = Mathf.Sin(e * Mathf.PI) * (WobbleAngulo * 0.25f);
+            _fundoRT.localEulerAngles = new Vector3(0,0,rot);
+
+            yield return null;
+        }
+        _fundoRT.anchoredPosition = alvo;
+
+        // IMPACTO + BOUNCES (squash & stretch)
+        float amp = Mathf.Clamp01(BounceImpactScale);
+        int reps = Mathf.Max(0, BounceRepeticoes);
+
+        // impacto (esmagar)
+        yield return ScaleTo(new Vector3(1f + amp, 1f - amp, 1f), Mathf.Max(0.04f, BounceDuracao * 0.6f));
+
+        // oscilações decrescentes
+        for (int i = 0; i < reps; i++)
+        {
+            float a = amp * Mathf.Pow(BounceDamping, i + 1);
+            // esticar
+            yield return ScaleTo(new Vector3(1f - a * 0.7f, 1f + a * 0.7f, 1f), Mathf.Max(0.06f, BounceDuracao));
+            // voltar ao 1
+            yield return ScaleTo(alvoScale, Mathf.Max(0.06f, BounceDuracao));
+        }
+
+        // wobble (abanico) decrescente
+        if (WobbleAngulo > 0f && WobbleDuracao > 0.01f)
+            yield return Wobble(alvoRotZ, WobbleAngulo, WobbleDuracao, WobbleDamping);
+
+        // garantir estado final exato
+        _fundoRT.localScale = alvoScale;
+        _fundoRT.localEulerAngles = new Vector3(0,0,alvoRotZ);
+        _fundoRT.anchoredPosition = alvo;
+    }
+
+    IEnumerator ScaleTo(Vector3 target, float dur)
+    {
+        Vector3 from = _fundoRT.localScale;
+        float t = 0f;
+        while (t < dur)
+        {
+            t += Time.unscaledDeltaTime;
+            float k = Mathf.Clamp01(t / dur);
+            // EaseOutQuad
+            float e = 1f - (1f - k) * (1f - k);
+            _fundoRT.localScale = Vector3.LerpUnclamped(from, target, e);
+            yield return null;
+        }
+        _fundoRT.localScale = target;
+    }
+
+    IEnumerator Wobble(float alvoRotZ, float angulo, float dur, float damping)
+    {
+        float t = 0f;
+        float damp = Mathf.Clamp01(damping);
+        while (t < dur)
+        {
+            t += Time.unscaledDeltaTime;
+            float k = t / dur;
+            float a = angulo * Mathf.Pow(damp, k * 4f);           // decaimento rápido
+            float rot = Mathf.Sin(k * Mathf.PI * 2f) * a;
+            _fundoRT.localEulerAngles = new Vector3(0, 0, alvoRotZ + rot);
+            yield return null;
+        }
+        _fundoRT.localEulerAngles = new Vector3(0, 0, alvoRotZ);
     }
 
     // ===== Compat =====
@@ -304,6 +421,7 @@ public class GameOverUI_Simple : MonoBehaviour
         {
             var c = FundoEscuro.color; c.a = EscurecerAlvo; FundoEscuro.color = c;
         }
+        if (_fundoRT) { _fundoRT.localScale = Vector3.one; _fundoRT.localEulerAngles = Vector3.zero; }
     }
     void EsconderPreviewEditor()
     {
@@ -312,6 +430,7 @@ public class GameOverUI_Simple : MonoBehaviour
         {
             var c = FundoEscuro.color; c.a = IntensidadeEscuro; FundoEscuro.color = c;
         }
+        if (_fundoRT) { _fundoRT.localScale = Vector3.one; _fundoRT.localEulerAngles = Vector3.zero; }
     }
 
     // ===== Anti “quadrados” =====
