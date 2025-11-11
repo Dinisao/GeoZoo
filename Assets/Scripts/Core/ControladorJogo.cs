@@ -1,6 +1,7 @@
 // ControladorJogo.cs — Gere HUD, temporizador e pontuação (+ gating de interação de tiles).
 // Mantém um singleton simples para acesso global (Instancia), atualiza o UI (tempo/ZOO),
 // e expõe chamadas para iniciar/parar/reiniciar o timer, recompensar acertos e ligar/desligar interação.
+// Agora com evento OnTempoEsgotado(int zoo) e propriedade ZooAtual.
 
 using TMPro;
 using UnityEngine;
@@ -10,6 +11,10 @@ using System.Collections;
 public class ControladorJogo : MonoBehaviour
 {
     public static ControladorJogo Instancia { get; private set; }
+
+    // === NOVO ===
+    public event System.Action<int> OnTempoEsgotado; // notifica quando chega a 0 (envia ZOO)
+    public int ZooAtual => _zoo;                     // leitura pública do total de “animais”
 
     [Header("HUD")]
     public TMP_Text TxtTempo;
@@ -79,7 +84,7 @@ public class ControladorJogo : MonoBehaviour
     }
 
     // Loop do temporizador: de segundo a segundo, reduz o tempo e atualiza o HUD.
-    // Quando chega a 0, pára e fica pronto para acionar um “Game Over” externo.
+    // Quando chega a 0, pára e dispara "Game Over".
     IEnumerator TickTimer()
     {
         while (_timerAtivo && _tempoRestante > 0)
@@ -94,7 +99,9 @@ public class ControladorJogo : MonoBehaviour
             _tempoRestante = 0;
             _timerAtivo = false;
             AtualizarHUD();
-            // TODO: aqui podes disparar "Game Over"
+
+            // 🔔 Dispara evento para UI de Game Over (ex.: GameOverUI)
+            OnTempoEsgotado?.Invoke(_zoo);
         }
     }
 
