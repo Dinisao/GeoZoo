@@ -1,131 +1,90 @@
 using UnityEngine;
+using UnityEngine.UI;
 
-[RequireComponent(typeof(SpriteRenderer))]
-public class CloudDrift2D : MonoBehaviour
+[RequireComponent(typeof(RectTransform), typeof(Image))]
+public class CloudDriftUI : MonoBehaviour
 {
     public enum Direction { LeftToRight, RightToLeft }
 
-    [Header("Câmara de referência")]
-    public Camera TargetCamera;                 // se vazio, usa Camera.main (ortográfica)
+    [Header("Área de movimento")]
+    public RectTransform TrackArea;                 // se vazio, usa o pai (CloudsLayer)
 
     [Header("Movimento")]
     public Direction MoveDirection = Direction.RightToLeft;
-    [Tooltip("Unidades por segundo (mundo). Mantém lento.")]
-    [Range(0.05f, 2f)] public float Speed = 0.5f;
+    [Tooltip("Pixels por segundo (UI). Mantém lento.")]
+    [Range(5f, 120f)] public float Speed = 24f;
     public bool RandomizeSpeed = true;
-    public Vector2 SpeedRange = new Vector2(0.25f, 0.65f); // todas lentas
-    [Tooltip("Margem extra para considerar 'fora de ecrã' (unidades de mundo).")]
-    public float OffscreenMargin = 0.5f;
-    [Tooltip("Usa unscaledDeltaTime para continuar mesmo se o jogo pausar timeScale=0.")]
+    public Vector2 SpeedRange = new Vector2(18f, 36f); // todas lentas
+    [Tooltip("Quanto deve sair do ecrã antes de reaparecer (px).")]
+    public float Margin = 60f;
+    [Tooltip("Continua a mexer mesmo se timeScale=0 (ex.: Game Over).")]
     public bool UseUnscaledTime = true;
 
-    [Header("Balanço opcional (suave)")]
+    [Header("Balanço opcional")]
     public bool Bobbing = true;
-    public float BobAmplitude = 0.15f;     // unidades de mundo
-    public float BobFrequency = 0.25f;     // ciclos por segundo
+    public float BobAmplitude = 6f;   // px
+    public float BobSpeed = 0.25f;    // ciclos/seg
 
     // internos
-    SpriteRenderer _sr;
-    float _halfWidth;          // metade da largura em mundo
+    RectTransform _rt;
+    float _halfWidth;
     float _baseY;
-    float _bobPhase;
+    float _phase;
 
     void Awake()
     {
-        _sr = GetComponent<SpriteRenderer>();
-        if (TargetCamera == null) TargetCamera = Camera.main;
-        _baseY = transform.position.y;
-        _bobPhase = Random.Range(0f, Mathf.PI * 2f);
+        _rt = GetComponent<RectTransform>();
+        if (TrackArea == null) TrackArea = _rt.parent as RectTransform;
 
-        // calcular metade da largura real em mundo
-        // Nota: bounds já em espaço de mundo e inclui scale.
-        _halfWidth = _sr.bounds.extents.x;
+        // UI: estas nuvens não precisam receber cliques
+        var img = GetComponent<Image>();
+        if (img) img.raycastTarget = false;
+
+        _baseY = _rt.anchoredPosition.y;
+        _phase = Random.Range(0f, Mathf.PI * 2f);
+        _halfWidth = Mathf.Abs(_rt.rect.width) * 0.5f;
 
         if (RandomizeSpeed)
             Speed = Random.Range(SpeedRange.x, SpeedRange.y);
     }
 
+    void OnRectTransformDimensionsChange()
+    {
+        if (_rt != null) _halfWidth = Mathf.Abs(_rt.rect.width) * 0.5f;
+    }
+
     void LateUpdate()
     {
-        if (TargetCamera == null) return;
+        if (TrackArea == null) return;
 
         float dt = UseUnscaledTime ? Time.unscaledDeltaTime : Time.deltaTime;
 
-        // Mover em X conforme direção
+        // mover em X
         float dir = (MoveDirection == Direction.LeftToRight) ? 1f : -1f;
-        Vector3 pos = transform.position;
+        var pos = _rt.anchoredPosition;
         pos.x += dir * Speed * dt;
 
-        // Bobbing suave opcional (não altera X de loop)
-        if (Bobbing && BobAmplitude > 0f && BobFrequency > 0f)
+        // bobbing (suave)
+        if (Bobbing && BobAmplitude > 0f && BobSpeed > 0f)
         {
             float t = UseUnscaledTime ? Time.unscaledTime : Time.time;
-            pos.y = _baseY + Mathf.Sin((t * BobFrequency * Mathf.PI * 2f) + _bobPhase) * BobAmplitude;
+            pos.y = _baseY + Mathf.Sin(_phase + t * BobSpeed * 2f * Mathf.PI) * BobAmplitude;
         }
 
-        // Repor quando sai do ecrã
-        GetHorizontalBounds(TargetCamera, out float leftX, out float rightX);
-
-        float leftLimit  = leftX  - OffscreenMargin - _halfWidth;
-        float rightLimit = rightX + OffscreenMargin + _halfWidth;
+        // limites horizontais com base no TrackArea (pivot central)
+        float halfW = TrackArea.rect.width * 0.5f;
+        float leftLimit  = -halfW - Margin - _halfWidth;
+        float rightLimit =  halfW + Margin + _halfWidth;
 
         if (MoveDirection == Direction.RightToLeft)
         {
-            // saiu pela ESQUERDA → volta a entrar pela DIREITA
-            if (pos.x < leftLimit)
-                pos.x = rightLimit;
+            if (pos.x < leftLimit) pos.x = rightLimit;   // saiu à esquerda → entra pela direita
         }
         else
         {
-            // saiu pela DIREITA → volta a entrar pela ESQUERDA
-            if (pos.x > rightLimit)
-                pos.x = leftLimit;
+            if (pos.x > rightLimit) pos.x = leftLimit;   // saiu à direita → entra pela esquerda
         }
 
-        transform.position = pos;
+        _rt.anchoredPosition = pos;
     }
-
-    void GetHorizontalBounds(Camera cam, out float leftX, out float rightX)
-    {
-        if (cam.orthographic)
-        {
-            float halfH = cam.orthographicSize;
-            float halfW = halfH * cam.aspect;
-            float cx = cam.transform.position.x;
-            leftX  = cx - halfW;
-            rightX = cx + halfW;
-        }
-        else
-        {
-            // fallback para câmara perspetiva: sample às bordas do viewport no plano da nuvem
-            float z = transform.position.z - cam.transform.position.z;
-            Vector3 leftWorld  = cam.ViewportToWorldPoint(new Vector3(0f, 0.5f, z));
-            Vector3 rightWorld = cam.ViewportToWorldPoint(new Vector3(1f, 0.5f, z));
-            leftX  = leftWorld.x;
-            rightX = rightWorld.x;
-        }
-    }
-
-#if UNITY_EDITOR
-    void OnDrawGizmosSelected()
-    {
-        if (!Application.isPlaying)
-        {
-            var sr = GetComponent<SpriteRenderer>();
-            if (sr) _halfWidth = sr.bounds.extents.x;
-        }
-        Camera cam = TargetCamera != null ? TargetCamera : Camera.main;
-        if (cam == null) return;
-
-        GetHorizontalBounds(cam, out float leftX, out float rightX);
-        float leftLimit  = leftX  - OffscreenMargin - _halfWidth;
-        float rightLimit = rightX + OffscreenMargin + _halfWidth;
-
-        Gizmos.color = Color.cyan;
-        Gizmos.DrawLine(new Vector3(leftLimit,  transform.position.y - 0.1f, transform.position.z),
-                        new Vector3(leftLimit,  transform.position.y + 0.1f, transform.position.z));
-        Gizmos.DrawLine(new Vector3(rightLimit, transform.position.y - 0.1f, transform.position.z),
-                        new Vector3(rightLimit, transform.position.y + 0.1f, transform.position.z));
-    }
-#endif
 }
