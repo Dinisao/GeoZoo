@@ -1,122 +1,170 @@
-// ControladorJogo.cs — Gere HUD, temporizador e pontuação (+ gating de interação de tiles).
-// Mantém um singleton simples para acesso global (Instancia), atualiza o UI (tempo/ZOO),
-// e expõe chamadas para iniciar/parar/reiniciar o timer, recompensar acertos e ligar/desligar interação.
-// Agora com evento OnTempoEsgotado(int zoo) e propriedade ZooAtual.
+// ControladorJogo.cs — Timer com cap a 120s, HUD otimizado e API estável.
+// Drop-in: mantém os métodos e propriedades que já usas no Deck/Grid.
 
 using TMPro;
 using UnityEngine;
-using System.Collections;
 
 [DefaultExecutionOrder(-1000)]
 public class ControladorJogo : MonoBehaviour
 {
     public static ControladorJogo Instancia { get; private set; }
 
-    // === NOVO ===
-    public event System.Action<int> OnTempoEsgotado; // notifica quando chega a 0 (envia ZOO)
-    public int ZooAtual => _zoo;                     // leitura pública do total de “animais”
+    // Evento dispara quando chega a 0 (envia ZOO atual)
+    public event System.Action<int> OnTempoEsgotado;
 
+    // === HUD (opcionais) ===
     [Header("HUD")]
     public TMP_Text TxtTempo;
     public TMP_Text TxtZoo;
 
-    [Header("Tempo")]
+    // === Configuração ===
+    [Header("Configuração do Tempo")]
+    [Tooltip("Tempo inicial do jogo em segundos (capado por MaxTempoSegundos).")]
     public int TempoInicialSeg = 120;
 
+    [Tooltip("Tempo máximo permitido (cap).")]
+    public int MaxTempoSegundos = 120;
+
+    [Tooltip("Bónus por acerto (em segundos).")]
+    public int BonusPorAcertoSeg = 20;
+
+    [Tooltip("Se true, usa unscaledDeltaTime (ignora Time.timeScale).")]
+    public bool usarUnscaledTime = false;
+
+    // === Leitura pública / estado ===
     public bool InteracaoPermitida { get; private set; }
+    public float TempoRestanteF => Mathf.Max(0f, _tempoRestanteF);
+    public int   TempoRestante   => Mathf.CeilToInt(TempoRestanteF);
+    public int   ZooAtual        => _zoo;
 
-    int _tempoRestante;
-    int _zoo;
-    bool _timerAtivo;
-    Coroutine _tick;
+    /// <summary>
+    /// 0..1 do tempo restante em relação ao CAP (útil para o círculo).
+    /// 1.0 = cheio (cap), 0.0 = vazio (0s).
+    /// </summary>
+    public float Progresso01 => (MaxTempoSegundos > 0)
+        ? Mathf.Clamp01(TempoRestanteF / MaxTempoSegundos)
+        : 0f;
 
-    // Setup do singleton + estado inicial do jogo (tempo e HUD).
+    // Internos
+    float _tempoRestanteF;
+    int   _zoo;
+    bool  _timerAtivo;
+
+    // Throttle de HUD
+    int _ultimoSegundoMostrado = -1;
+    int _ultimoZooMostrado     = -1;
+
+    float Delta => usarUnscaledTime ? Time.unscaledDeltaTime : Time.deltaTime;
+
+    // ===== Ciclo de vida =====
     void Awake()
     {
         if (Instancia != null && Instancia != this) { Destroy(gameObject); return; }
         Instancia = this;
-
-        _tempoRestante = Mathf.Max(0, TempoInicialSeg);
+        SanitizarConfig();
+        _tempoRestanteF = TempoInicialSeg;
         InteracaoPermitida = false;
-        AtualizarHUD();
     }
 
-    // Arranca o temporizador se ainda não estiver a contar.
-    // Chamado quando a carta estaciona no preview (coordenado pelo DeckController).
+    void OnEnable()  => AtualizarHUD(force:true);
+    void OnValidate(){ SanitizarConfig(); AtualizarHUD(force:true); }
+
+    void Update()
+    {
+        if (!_timerAtivo) return;
+
+        _tempoRestanteF -= Delta;
+        if (_tempoRestanteF <= 0f)
+        {
+            _tempoRestanteF = 0f;
+            _timerAtivo = false;
+            AtualizarHUD(force:true);
+            OnTempoEsgotado?.Invoke(_zoo);
+            return;
+        }
+
+        AtualizarHUD(); // throttle interno
+    }
+
+    // ===== API pública =====
+    // Chamado pelo Deck quando a carta fica no preview.
     public void IniciarTimerSeAindaNao()
     {
         if (_timerAtivo) return;
-        if (_tempoRestante <= 0) _tempoRestante = Mathf.Max(1, TempoInicialSeg); // evita começar a 0
+        if (_tempoRestanteF <= 0f)
+            _tempoRestanteF = Mathf.Clamp(TempoInicialSeg, 1, MaxTempoSegundos);
 
-        _timerAtivo = true;
-        if (_tick != null) StopCoroutine(_tick);
-        _tick = StartCoroutine(TickTimer());
+        _timerAtivo = (_tempoRestanteF > 0f);
+        AtualizarHUD(force:true);
     }
 
-    // Pausa o temporizador (não reseta o tempo restante).
-    public void PararTimer()
-    {
-        _timerAtivo = false;
-        if (_tick != null) StopCoroutine(_tick);
-        _tick = null;
-    }
+    public void PararTimer() => _timerAtivo = false;
 
-    // Para o temporizador e repõe o tempo no valor inicial.
     public void ReiniciarTimer()
     {
-        PararTimer();
-        _tempoRestante = Mathf.Max(0, TempoInicialSeg);
-        AtualizarHUD();
+        _timerAtivo = false;
+        _tempoRestanteF = Mathf.Clamp(TempoInicialSeg, 0, MaxTempoSegundos);
+        AtualizarHUD(force:true);
     }
 
-    // Liga/desliga a interação do jogador com os tiles (gating de jogabilidade).
-    public void DefinirInteracaoTiles(bool ativo)
+    // Útil para efeitos/powerups/debug; respeita o CAP e não deixa negativo.
+    public void AddTempo(float segundos)
     {
-        InteracaoPermitida = ativo;
+        _tempoRestanteF = Mathf.Clamp(_tempoRestanteF + segundos, 0f, MaxTempoSegundos);
+        AtualizarHUD(force:true);
     }
 
-    // Aplica recompensa por padrão correto: +1 no ZOO e +20s no relógio.
+    // “Teleporta” o tempo (debug).
+    public void SetTempoAbsoluto(float segundos)
+    {
+        _tempoRestanteF = Mathf.Clamp(segundos, 0f, MaxTempoSegundos);
+        AtualizarHUD(force:true);
+    }
+
+    public void DefinirInteracaoTiles(bool ativo) => InteracaoPermitida = ativo;
+
+    // +1 ZOO e +20s, capado a MaxTempoSegundos
     public void RecompensaAcerto()
     {
         _zoo += 1;
-        _tempoRestante += 20; // +20s por acerto
-        AtualizarHUD();
+        _tempoRestanteF = Mathf.Min(_tempoRestanteF + BonusPorAcertoSeg, MaxTempoSegundos);
+        AtualizarHUD(force:true);
     }
 
-    // Loop do temporizador: de segundo a segundo, reduz o tempo e atualiza o HUD.
-    // Quando chega a 0, pára e dispara "Game Over".
-    IEnumerator TickTimer()
+    // ===== Helpers =====
+    void AtualizarHUD(bool force = false)
     {
-        while (_timerAtivo && _tempoRestante > 0)
+        // Só recalcula string quando o segundo inteiro muda ou o ZOO muda
+        int segInt = TempoRestante;
+        bool mudouSegundo = (segInt != _ultimoSegundoMostrado);
+        bool mudouZoo     = (_zoo   != _ultimoZooMostrado);
+
+        if (!force && !mudouSegundo && !mudouZoo) return;
+
+        if (TxtZoo && (force || mudouZoo))
         {
-            yield return new WaitForSeconds(1f); // 1 segundo real por tick
-            _tempoRestante--;
-            AtualizarHUD();
+            TxtZoo.text = $"ZOO: {_zoo}";
+            _ultimoZooMostrado = _zoo;
         }
-
-        if (_tempoRestante <= 0)
+        if (TxtTempo && (force || mudouSegundo))
         {
-            _tempoRestante = 0;
-            _timerAtivo = false;
-            AtualizarHUD();
-
-            // 🔔 Dispara evento para UI de Game Over (ex.: GameOverUI)
-            OnTempoEsgotado?.Invoke(_zoo);
+            TxtTempo.text = Formatar(segInt);
+            _ultimoSegundoMostrado = segInt;
         }
     }
 
-    // Atualiza os textos do HUD com o ZOO e o tempo formatado (M:SS).
-    void AtualizarHUD()
+    static string Formatar(int segundos)
     {
-        if (TxtZoo)   TxtZoo.text   = $"ZOO: {_zoo}";
-        if (TxtTempo) TxtTempo.text = $"{Formatar(_tempoRestante)}";
-    }
-
-    // Converte segundos em "m:ss".
-    string Formatar(int segundos)
-    {
-        int m = Mathf.Max(0, segundos) / 60;
-        int s = Mathf.Max(0, segundos) % 60;
+        if (segundos < 0) segundos = 0;
+        int m = segundos / 60;
+        int s = segundos % 60;
         return $"{m}:{s:00}";
+    }
+
+    void SanitizarConfig()
+    {
+        MaxTempoSegundos  = Mathf.Max(1, MaxTempoSegundos);
+        TempoInicialSeg   = Mathf.Clamp(TempoInicialSeg, 0, MaxTempoSegundos);
+        BonusPorAcertoSeg = Mathf.Max(0, BonusPorAcertoSeg);
     }
 }
