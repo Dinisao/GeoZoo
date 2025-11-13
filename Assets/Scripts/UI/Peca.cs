@@ -42,6 +42,10 @@ public class Peca : MonoBehaviour,
     // Lido pelo GridValidator
     public int RotacaoGraus => (_rotacoes90 * 90);
 
+    // [NOVO] — expor estados para o GridValidator ignorar peças ainda em interação
+    public bool IsDragging => _dragging;     // [NOVO]
+    public bool IsHeld     => _leftHeld;     // [NOVO]
+
     // Cache de componentes essenciais; garante CanvasGroup presente.
     void Awake()
     {
@@ -117,7 +121,10 @@ public class Peca : MonoBehaviour,
     public void OnPointerUp(PointerEventData eventData)
     {
         if (eventData.button == PointerEventData.InputButton.Left)
+        {
             _leftHeld = false;
+            OnPecaStateChanged?.Invoke(); // [NOVO] — notifica para revalidar ao largar
+        }
     }
 
     // ---------- Drag & Drop ----------
@@ -149,6 +156,7 @@ public class Peca : MonoBehaviour,
         if (_gridLayout != null) _rt.sizeDelta = _gridLayout.cellSize;
 
         SeguirRato(eventData);
+        OnPecaStateChanged?.Invoke(); // [NOVO] — estado mudou
     }
 
     // Durante o drag: segue o cursor e atualiza o highlight da célula sob o rato (permitida/bloqueada).
@@ -203,7 +211,7 @@ public class Peca : MonoBehaviour,
             if (gfx) gfx.rectTransform.localScale = Vector3.one;  // reset escala do filho
         }
 
-        OnPecaStateChanged?.Invoke();
+        OnPecaStateChanged?.Invoke(); // [NOVO] — estado mudou ao terminar drag
     }
 
     // Mantém a peça debaixo do cursor, usando o espaço do dragLayer para evitar saltos.
@@ -255,7 +263,6 @@ public class Peca : MonoBehaviour,
 
     // -------- NOVOS MÉTODOS DE RECOLHA --------
 
-    // Anima a peça a regressar para a mão (suave e curto) e, no fim, chama VoltarParaMao() para consolidar.
     public IEnumerator AnimarVoltarParaMao(float dur = 0.25f)
     {
         if (_maoContainer == null || _dragLayer == null)
@@ -267,15 +274,12 @@ public class Peca : MonoBehaviour,
         var canvas = GetComponentInParent<Canvas>();
         var cam = (canvas && canvas.renderMode != RenderMode.ScreenSpaceOverlay) ? canvas.worldCamera : null;
 
-        // Ponto inicial e final (em coords locais do dragLayer)
         Vector2 p0 = WorldToLocal(_dragLayer, _rt.position, cam);
         Vector2 p1 = WorldToLocal(_dragLayer, _maoContainer.position, cam);
 
-        // Coloca no dragLayer mantendo a posição visual
         _rt.SetParent(_dragLayer, worldPositionStays: true);
         _rt.SetAsLastSibling();
 
-        // Aparência durante a animação
         float startAlpha = (_cg ? _cg.alpha : 1f);
         if (_cg) { _cg.blocksRaycasts = false; }
         if (_img) _img.raycastTarget = false;
@@ -283,14 +287,11 @@ public class Peca : MonoBehaviour,
         Vector3 s0 = _rt.localScale;
         Vector3 s1 = s0 * 0.85f;
 
-        // Corre a animação (ease smoothstep)
         float t = 0f;
         while (t < 1f)
         {
             t += Time.unscaledDeltaTime / Mathf.Max(0.0001f, dur);
             float k = Mathf.Clamp01(t);
-
-            // ease
             float ke = k * k * (3f - 2f * k); // smoothstep
 
             _rt.anchoredPosition = Vector2.LerpUnclamped(p0, p1, ke);
@@ -300,11 +301,9 @@ public class Peca : MonoBehaviour,
             yield return null;
         }
 
-        // Teleporta logicamente para a mão e RESTAURA COMPLETAMENTE
         VoltarParaMao();
     }
 
-    // Regressa de imediato à mão (sem animação). Layout reposiciona no container.
     public void VoltarParaMao()
     {
         if (_maoContainer == null) return;
@@ -315,9 +314,9 @@ public class Peca : MonoBehaviour,
         _rt.SetParent(_maoContainer, worldPositionStays: false);
         _rt.sizeDelta = _tamanhoMao;
         _rt.localEulerAngles = Vector3.zero;
-        _rt.localScale = Vector3.one;                         // reset escala
+        _rt.localScale = Vector3.one;
         var gfx = GetComponentInChildren<Image>(true);
-        if (gfx) gfx.rectTransform.localScale = Vector3.one;  // reset escala do filho
+        if (gfx) gfx.rectTransform.localScale = Vector3.one;
 
         if (_cg != null) { _cg.alpha = 1f; _cg.blocksRaycasts = true; }
         if (_img != null) _img.raycastTarget = true;
@@ -325,7 +324,6 @@ public class Peca : MonoBehaviour,
         OnPecaStateChanged?.Invoke();
     }
 
-    // Gate de interação: depende da flag global do ControladorJogo e de existir carta ativa no Deck.
     bool PodeInteragir()
     {
         if (ControladorJogo.Instancia && !ControladorJogo.Instancia.InteracaoPermitida) return false;
@@ -336,7 +334,6 @@ public class Peca : MonoBehaviour,
         return true;
     }
 
-    // Utilitário para converter world→local num RectTransform (respeitando a câmara do Canvas).
     static Vector2 WorldToLocal(RectTransform parent, Vector3 worldPos, Camera cam)
     {
         Vector2 sp = RectTransformUtility.WorldToScreenPoint(cam, worldPos);

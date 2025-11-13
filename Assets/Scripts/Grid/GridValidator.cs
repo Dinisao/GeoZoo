@@ -3,22 +3,19 @@
 // pára o timer, aplica recompensa, opcionalmente recolhe peças, limpa preview,
 // VFX de vitória e, no fim, desbloqueia o deck.
 
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;              // <- adicionado (reflection para disparar o bounce)
 using UnityEngine;
 using UnityEngine.UI; // <- necessário para 'Image'
 
-/// Valida o layout atual da grelha contra o AnimalPattern ativo.
-/// Regras de Eye:
-///  • Eye    -> verso com olho (F1/F2)
-///  • NoEye  -> verso sem olho (F3/F4)
-///  • None   -> “não-Eye” (frente OU verso sem olho)
 public class GridValidator : MonoBehaviour
 {
     [Header("Referências")]
-    public RectTransform GridRoot;     // Parent das células (cada filho tem CelulaGrelha)
-    public DeckController Deck;        // Referência ao Deck (opcional mas recomendado)
+    public RectTransform GridRoot;
+    public DeckController Deck;
 
     [Header("FX de Vitória")]
     public AnimalWinVFX VitoriaFX;
@@ -34,7 +31,7 @@ public class GridValidator : MonoBehaviour
     public bool LimparPreviewAoAcertar = true;
 
     [Header("Animação de Recolha")]
-    public float DurRecolha = 0.25f; // duração do “arrastar” automático para a mão
+    public float DurRecolha = 0.25f;
 
     [Header("Debug")]
     public bool debugLogs = true;
@@ -46,12 +43,13 @@ public class GridValidator : MonoBehaviour
     string _ultimoHash = null;
     bool _resetAgendado = false;
 
-    // Define o padrão que deve ser validado. Força revalidação imediata (hash reset).
-    // Útil para logging de flags do pattern no momento em que fica ativo.
+    // ————————————————————————————————————————————————————————————
+    // Ciclo de vida / wiring
+    // ————————————————————————————————————————————————————————————
     public void DefinirPadraoAtivo(AnimalPattern ap)
     {
         _ativo = ap;
-        _ultimoHash = null; // força revalidar já
+        _ultimoHash = null;
         if (debugLogs && _ativo)
         {
             Debug.Log($"[GridValidator] Pattern ativo: {_ativo.name} (tiles={_ativo.cellsRelatives?.Count ?? 0})", this);
@@ -59,37 +57,34 @@ public class GridValidator : MonoBehaviour
         }
     }
 
-    // Tentativa de auto-wiring: procurar GridRoot (via células) e Deck caso não estejam atribuídos.
     void Awake()
     {
-        // tentar descobrir GridRoot automaticamente
+#if UNITY_2023_1_OR_NEWER
         if (!GridRoot)
         {
-#if UNITY_2023_1_OR_NEWER
             var allCells = UnityEngine.Object.FindObjectsByType<CelulaGrelha>(
                 FindObjectsInactive.Include, FindObjectsSortMode.None);
-#else
-            var allCells = UnityEngine.Object.FindObjectsOfType<CelulaGrelha>(true);
-#endif
             var any = allCells.FirstOrDefault();
             if (any) GridRoot = any.transform.parent as RectTransform;
         }
-
-        // tentar obter Deck se faltar
-        if (!Deck)
-        {
-#if UNITY_2023_1_OR_NEWER
-            Deck = UnityEngine.Object.FindFirstObjectByType<DeckController>(FindObjectsInactive.Include);
+        if (!Deck) Deck = UnityEngine.Object.FindFirstObjectByType<DeckController>(FindObjectsInactive.Include);
 #else
-            Deck = UnityEngine.Object.FindObjectOfType<DeckController>(true);
-#endif
+        if (!GridRoot)
+        {
+            var allCells = UnityEngine.Object.FindObjectsOfType<CelulaGrelha>(true);
+            var any = allCells.FirstOrDefault();
+            if (any) GridRoot = any.transform.parent as RectTransform;
         }
+        if (!Deck) Deck = UnityEngine.Object.FindObjectOfType<DeckController>(true);
+#endif
     }
 
-    // Observa alterações de estado do tabuleiro por um hash simples e dispara validação quando muda.
+    void OnEnable()    { Peca.OnPecaStateChanged += ForcarRevalidacao; }
+    void OnDisable()   { Peca.OnPecaStateChanged -= ForcarRevalidacao; }
+    void ForcarRevalidacao() { _ultimoHash = null; Validar(); }
+
     void LateUpdate()
     {
-        // revalida apenas quando o "estado" do tabuleiro mudar
         var h = HashDoTabuleiro();
         if (h != _ultimoHash)
         {
@@ -98,7 +93,9 @@ public class GridValidator : MonoBehaviour
         }
     }
 
-    // Núcleo da verificação: recolhe peças colocadas, verifica contagem e tenta casar contra o pattern.
+    // ————————————————————————————————————————————————————————————
+    // Validação principal
+    // ————————————————————————————————————————————————————————————
     void Validar()
     {
         if (_ativo == null) { Sinalizar(false, false); return; }
@@ -120,8 +117,6 @@ public class GridValidator : MonoBehaviour
         Sinalizar(match, true);
     }
 
-    // Atualiza flags públicas e desencadeia efeitos colaterais:
-    // callback no Deck, parar timer + recompensa, e agendar ciclo de recolha/VFX.
     void Sinalizar(bool valido, bool completo)
     {
         if (EstadoValido == valido && EstadoCompleto == completo) return;
@@ -129,7 +124,6 @@ public class GridValidator : MonoBehaviour
         EstadoValido = valido;
         EstadoCompleto = completo;
 
-        // callback direto ao Deck (se existir)
         if (Deck != null)
         {
             try { Deck.OnGridValidationChanged(valido, completo); } catch { }
@@ -137,11 +131,13 @@ public class GridValidator : MonoBehaviour
 
         if (valido && completo)
         {
-            // ❶ pára timer e dá recompensa (+1 ZOO, +20s)
+            // ✅ Impact bounce imediato (feedback “juicy”), compatível com ImpactBounce OU ImpactBounceUIRoot
+            TentarDispararImpactBounce(1f);
+
+            // Fluxo normal
             ControladorJogo.Instancia?.PararTimer();
             ControladorJogo.Instancia?.RecompensaAcerto();
 
-            // ❷ iniciar ciclo de recolha/limpeza se ainda não em curso
             if (RecolherAoAcertar && !_resetAgendado)
             {
                 _resetAgendado = true;
@@ -150,8 +146,6 @@ public class GridValidator : MonoBehaviour
         }
     }
 
-    // Fluxo pós-acerto: atraso opcional, recolha animada, limpeza do preview, VFX de vitória,
-    // desbloqueio do deck e revalidação final para estabilizar o estado.
     IEnumerator CoRecolherAposAcerto()
     {
         if (AtrasoRecolha <= 0f) yield return null;
@@ -160,43 +154,41 @@ public class GridValidator : MonoBehaviour
         // Recolha ANIMADA das peças para a mão
         yield return RecolherTodasPecasParaMaoAnimado(DurRecolha);
 
-        // Limpar preview (com fade se Image tiver CanvasRenderer)
+        // Limpar preview (com fade)
         if (LimparPreviewAoAcertar && Deck != null)
         {
             Deck.LimparCartaAtual();
-            // pequena espera para respeitar o fade (~0.25s)
             yield return new WaitForSeconds(0.26f);
         }
 
-        // ❸ Tocar vídeo de vitória (se existir). Timer fica parado durante o vídeo.
+        // Vídeo de vitória (se mapeado)
         if (VitoriaFX != null)
         {
             yield return VitoriaFX.PlayForRoutine(_ativo);
         }
 
-        // ❹ Deck pronto para nova compra
+        // Deck pronto para nova compra
         if (Deck != null) Deck.DesbloquearDeck();
 
-        // força revalidação “limpa”
+        // Reset & revalidação
         _ultimoHash = null;
         _resetAgendado = false;
         Validar();
     }
 
-    // --------- recolha & matching ----------
-
+    // ————————————————————————————————————————————————————————————
+    // Colheita do estado da grelha
+    // ————————————————————————————————————————————————————————————
     struct Colocada
     {
-        public Vector2Int cell;   // coords da célula (índice da grelha, normalizada mais à frente)
-        public int rot;           // 0/90/180/270 (normalizado)
-        public EyeRequirement eye;// None/Eye/NoEye
+        public Vector2Int cell;
+        public int rot;
+        public EyeRequirement eye;
 #if UNITY_EDITOR
-        public string debug;      // info extra (frente/verso)
+        public string debug;
 #endif
     }
 
-    // Percorre as células e extrai as peças colocadas, com rotação e estado Eye deduzido.
-    // Mantém apenas o essencial para comparar com o pattern ativo.
     List<Colocada> ColherPecasColocadas()
     {
         var outList = new List<Colocada>();
@@ -209,7 +201,6 @@ public class GridValidator : MonoBehaviour
             var cel = cellRT.GetComponent<CelulaGrelha>();
             if (!cel) continue;
 
-            // Pega a peça (pode estar como filho em profundidade)
             Peca peca = null;
             for (int j = 0; j < cellRT.childCount; j++)
             {
@@ -218,11 +209,15 @@ public class GridValidator : MonoBehaviour
             }
             if (!peca) continue;
 
-            // Rotação da peça (RectTransform)
+            // Ignorar peça ainda em interação (evita “acerto” sem pousar)
+            var cg = peca.GetComponent<CanvasGroup>();
+            if (peca.IsDragging) continue;
+            if (peca.IsHeld)     continue;
+            if (cg != null && cg.blocksRaycasts == false) continue;
+
             var rt = peca.transform as RectTransform;
             int rot = NormRot(rt ? rt.localEulerAngles.z : 0f);
 
-            // Determinar Eye (frente/verso)
             var flip = peca.GetComponent<PecaFlip>();
             EyeRequirement eye = EyeRequirement.None;
             string dbg = "FRENTE";
@@ -254,13 +249,13 @@ public class GridValidator : MonoBehaviour
         return outList;
     }
 
-    // Compara as peças colocadas contra o pattern, suportando rotações globais e duas convenções
-    // (Math CCW / UI CW). Implementa as regras de rotação, Eye/NoEye e “meia-volta” quando permitido.
+    // ————————————————————————————————————————————————————————————
+    // Matching contra o pattern
+    // ————————————————————————————————————————————————————————————
     bool TentaCasar(List<Colocada> colocadas, AnimalPattern ap, bool exigirRotacao, out string dbg)
     {
         dbg = "";
 
-        // Normalizar posições para (0,0) no topo-esquerdo do conjunto
         int minX = colocadas.Min(c => c.cell.x);
         int minY = colocadas.Min(c => c.cell.y);
         var colocadasNorm = colocadas
@@ -275,7 +270,6 @@ public class GridValidator : MonoBehaviour
             .OrderBy(c => c.cell.y).ThenBy(c => c.cell.x)
             .ToList();
 
-        // Constrói "expected" a partir do pattern base
         var rel  = ap.cellsRelatives ?? new List<Vector2Int>();
         var rots = ap.cellsRotations ?? new List<int>();
         var eyes = ap.cellsEyeReq    ?? new List<EyeRequirement>();
@@ -289,28 +283,22 @@ public class GridValidator : MonoBehaviour
             expectedBase.Add((pos, rot, eye));
         }
 
-        // Tentar casar com rotações globais (0/90/180/270) se permitido
         var rotacoesGlobais = ap.PermitirRotacoesGlobais ? new[] {0,90,180,270} : new[] {0};
         foreach (int rGlobal in rotacoesGlobais)
         {
-            // Permitir duas convenções de rotação (Math vs UI), consoante onde o pattern foi criado
             foreach (var rotFn in new System.Func<Vector2Int,int,Vector2Int>[] { RotacionarMath, RotacionarUI })
             {
-                // Pos esperadas com rGlobal aplicado
                 var expCells = expectedBase.Select(e => rotFn(e.pos, rGlobal)).ToList();
 
-                // Normaliza expCells para (0,0)
                 int eMinX = expCells.Min(v => v.x);
                 int eMinY = expCells.Min(v => v.y);
                 for (int i = 0; i < expCells.Count; i++)
                     expCells[i] = new Vector2Int(expCells[i].x - eMinX, expCells[i].y - eMinY);
 
-                // Rotações esperadas (nota: base está em convenção Math/CCW)
                 var expRots = new List<int>(expectedBase.Count);
                 for (int i = 0; i < expectedBase.Count; i++)
                 {
                     int baseRotMath = expectedBase[i].rot;
-                    // Se rodámos as POSIÇÕES em UI (CW), o equivalente para rotação local é subtrair rGlobal.
                     int apply = (rotFn == RotacionarUI) ? NormRot(baseRotMath - rGlobal) : NormRot(baseRotMath + rGlobal);
                     expRots.Add(apply);
                 }
@@ -332,10 +320,8 @@ public class GridValidator : MonoBehaviour
 
                     if (got.cell != exp.pos) { ok = false; break; }
 
-                    // Rotação por tile
                     if (exigirRotacao)
                     {
-                        // *** IGNORA rotação na célula Eye ***
                         bool ignorarRotCelulaEye = (exp.eye == EyeRequirement.Eye);
                         if (!ignorarRotCelulaEye)
                         {
@@ -346,7 +332,6 @@ public class GridValidator : MonoBehaviour
                         }
                     }
 
-                    // Eye rules
                     if (exp.eye == EyeRequirement.Eye)
                     {
                         if (got.eye != EyeRequirement.Eye) { ok = false; break; }
@@ -355,26 +340,11 @@ public class GridValidator : MonoBehaviour
                     {
                         if (got.eye != EyeRequirement.NoEye) { ok = false; break; }
                     }
-                    else // None -> não Eye (aceita frente ou verso sem olho)
+                    else
                     {
                         if (got.eye == EyeRequirement.Eye) { ok = false; break; }
                     }
                 }
-
-#if UNITY_EDITOR
-                if (!ok && debugLogs)
-                {
-                    var lines = new List<string>();
-                    for (int i = 0; i < expected.Count; i++)
-                    {
-                        var got = colocadasNorm[i];
-                        var exp = expected[i];
-                        lines.Add($" i={i} pos={got.cell} rot={got.rot} eye={got.eye} [{got.debug}]  expPos={exp.pos} expRot={exp.rot} expEye={exp.eye}");
-                    }
-                    Debug.Log($"[GridValidator] detalhes falha (rGlobal={rGlobal}, rotFn={(rotFn==RotacionarMath?"Math":"UI")}, exigirRot={exigirRotacao})\n" +
-                              string.Join("\n", lines), this);
-                }
-#endif
 
                 if (ok) { dbg = $"(rGlobal={rGlobal}, rotFn={(rotFn==RotacionarMath?"Math":"UI")}, exigirRot={exigirRotacao})"; return true; }
             }
@@ -384,7 +354,9 @@ public class GridValidator : MonoBehaviour
         return false;
     }
 
-    // Normaliza graus para múltiplos de 90° em [0, 360).
+    // ————————————————————————————————————————————————————————————
+    // Utilitários
+    // ————————————————————————————————————————————————————————————
     static int NormRot(float graus)
     {
         int g = Mathf.RoundToInt(graus) % 360; if (g < 0) g += 360;
@@ -392,7 +364,6 @@ public class GridValidator : MonoBehaviour
         return (q % 360 + 360) % 360;
     }
 
-    // Rotação “matemática” (CCW): útil quando o pattern foi construído nessa convenção.
     static Vector2Int RotacionarMath(Vector2Int v, int graus)
     {
         switch (((graus % 360) + 360) % 360)
@@ -405,7 +376,6 @@ public class GridValidator : MonoBehaviour
         }
     }
 
-    // Rotação “UI” (CW): reflete o senso comum na UI (eixo Y para baixo).
     static Vector2Int RotacionarUI(Vector2Int v, int graus)
     {
         switch (((graus % 360) + 360) % 360)
@@ -418,8 +388,6 @@ public class GridValidator : MonoBehaviour
         }
     }
 
-    // Gera um hash textual do estado atual do tabuleiro (pos/rot/eye) + pattern ativo.
-    // Ajuda a evitar validações redundantes em cada frame.
     string HashDoTabuleiro()
     {
         var list = ColherPecasColocadas()
@@ -429,13 +397,11 @@ public class GridValidator : MonoBehaviour
         return _ativo ? $"{_ativo.GetInstanceID()}|{string.Join(";", list)}" : string.Join(";", list);
     }
 
-    // ---- recolha animada para a mão ----
-    // Faz animação sequencial de regresso à mão (curta o suficiente para 4 peças).
+    // ——— Recolhas ———
     public IEnumerator RecolherTodasPecasParaMaoAnimado(float dur)
     {
         if (!GridRoot) yield break;
 
-        // Faz sequencialmente (4 peças -> ok). Se quiseres paralelo, diz-me.
         for (int i = 0; i < GridRoot.childCount; i++)
         {
             var cellRT = GridRoot.GetChild(i) as RectTransform;
@@ -449,7 +415,6 @@ public class GridValidator : MonoBehaviour
         }
     }
 
-    // Versão instantânea: retorna as peças para a mão sem animação.
     public void RecolherTodasPecasParaMao()
     {
         if (!GridRoot) return;
@@ -462,5 +427,81 @@ public class GridValidator : MonoBehaviour
             var peca = cellRT.GetComponentInChildren<Peca>(includeInactive: false);
             if (peca != null) peca.VoltarParaMao();
         }
+    }
+
+    // ————————————————————————————————————————————————————————————
+    // Helper: dispara ImpactBounce (ou ImpactBounceUIRoot) sem dependência direta
+    // ————————————————————————————————————————————————————————————
+    void TentarDispararImpactBounce(float intensity)
+    {
+        // 1) Tenta classe "ImpactBounce" com singleton Instancia
+        if (TentarPlayPorNome("ImpactBounce", intensity)) return;
+
+        // 2) Tenta classe alternativa "ImpactBounceUIRoot"
+        if (TentarPlayPorNome("ImpactBounceUIRoot", intensity)) return;
+
+        // 3) Fallback: procurar qualquer MonoBehaviour com esses nomes e invocar Play
+#if UNITY_2023_1_OR_NEWER
+        var todos = UnityEngine.Object.FindObjectsByType<MonoBehaviour>(
+            FindObjectsInactive.Include, FindObjectsSortMode.None);
+#else
+        var todos = Resources.FindObjectsOfTypeAll<MonoBehaviour>();
+#endif
+        foreach (var mb in todos)
+        {
+            if (mb == null) continue;
+            var n = mb.GetType().Name;
+            if (n == "ImpactBounce" || n == "ImpactBounceUIRoot")
+            {
+                var m = mb.GetType().GetMethod("Play", new Type[] { typeof(float) })
+                        ?? mb.GetType().GetMethod("Play", Type.EmptyTypes);
+                if (m != null)
+                {
+                    try
+                    {
+                        if (m.GetParameters().Length == 0) m.Invoke(mb, null);
+                        else m.Invoke(mb, new object[] { intensity });
+                        return;
+                    }
+                    catch { /* silencioso */ }
+                }
+            }
+        }
+    }
+
+    bool TentarPlayPorNome(string tipoNome, float intensity)
+    {
+        try
+        {
+            var t = Type.GetType(tipoNome); // tenta full-name default
+            if (t == null)
+            {
+                // procurar por nome simples em todos os assemblies
+                foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+                {
+                    t = asm.GetTypes().FirstOrDefault(x => x.Name == tipoNome);
+                    if (t != null) break;
+                }
+            }
+            if (t == null) return false;
+
+            // tentar propriedade estática "Instancia"
+            var instProp = t.GetProperty("Instancia", BindingFlags.Public | BindingFlags.Static);
+            var inst = instProp?.GetValue(null);
+            if (inst != null)
+            {
+                var m = t.GetMethod("Play", new Type[] { typeof(float) })
+                      ?? t.GetMethod("Play", Type.EmptyTypes);
+                if (m != null)
+                {
+                    if (m.GetParameters().Length == 0) m.Invoke(inst, null);
+                    else m.Invoke(inst, new object[] { intensity });
+                    return true;
+                }
+            }
+        }
+        catch { /* silencioso */ }
+
+        return false;
     }
 }

@@ -15,6 +15,7 @@ GameObject:
   - component: {fileID: 8280133153072513766}
   - component: {fileID: 5296173184387467336}
   - component: {fileID: -7690740188946735799}
+  - component: {fileID: 4686038610890230168}
   m_Layer: 5
   m_Name: PF_Peca
   m_TagString: Untagged
@@ -137,3 +138,20 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PecaFlip
   Frente: {fileID: 0}
   Verso: {fileID: 0}
+  Duracao: 0.18
+  Alvo: {fileID: 0}
+--- !u!114 &4686038610890230168
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5529627298171470724}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c0b47ef797920e04fb91fe1ba400fe1b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PecaSparkleTrigger
+  fx: {fileID: 0}
+  contornarTileNaoCelula: 0
+  umaVezPorRonda: 0
