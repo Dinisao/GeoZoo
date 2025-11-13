@@ -53,6 +53,11 @@ public class CardAnimator : MonoBehaviour
             Debug.LogError("[CardAnimator] Referências em falta.", this);
             return;
         }
+
+        // 🔹 Garantir que o FX_Layer está NO TOPO do Canvas
+        //    (assim o clone nunca fica escondido por trás de outros grupos de UI).
+        fxLayer.SetAsLastSibling();
+
         StartCoroutine(CoPlay(deckBack, posCentro, posPreview, frente, verso, imgPreview, onFinish));
     }
 
@@ -74,12 +79,18 @@ public class CardAnimator : MonoBehaviour
         rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
         rt.pivot = new Vector2(0.5f, 0.5f);
         rt.sizeDelta = deckBack.rectTransform.rect.size;
-        img.preserveAspect = true; img.raycastTarget = false;
+        img.preserveAspect = true;
+        img.raycastTarget = false;
         if (le) le.ignoreLayout = true;
-        if (cg) { cg.blocksRaycasts = false; cg.interactable = false; }
+        if (cg)
+        {
+            cg.blocksRaycasts = false;
+            cg.interactable = false;
+        }
         rt.SetAsLastSibling();
 
         img.sprite = verso;
+        img.color = Color.white; // segurança: garante que não herdamos alguma cor estranha
 
         // Posições (convertidas para o espaço do fxLayer)
         Vector2 p0   = WorldToLocal(fxLayer, deckBack.rectTransform.position, _uiCam);
@@ -115,7 +126,8 @@ public class CardAnimator : MonoBehaviour
 
         // C) pop (pequeno overshoot de escala para dar impacto visual)
         if (debugLogs) Debug.Log("[CardAnimator] Fase C (pop)", this);
-        Vector3 s0 = Vector3.one, s1 = Vector3.one * Mathf.Max(1f, popScale);
+        Vector3 s0 = Vector3.one;
+        Vector3 s1 = Vector3.one * Mathf.Max(1f, popScale);
         yield return Run(durPopNoCentro, t =>
         {
             float up = t <= 0.5f ? t * 2f : (1f - (t - 0.5f) * 2f);
@@ -133,7 +145,9 @@ public class CardAnimator : MonoBehaviour
         // Finalização: aplica sprite no preview (se existir) ou fixa o clone no alvo.
         if (imgPreview != null)
         {
-            if (imgPreview.canvasRenderer != null) imgPreview.canvasRenderer.SetAlpha(1f);
+            if (imgPreview.canvasRenderer != null)
+                imgPreview.canvasRenderer.SetAlpha(1f);
+
             imgPreview.sprite = frente;
             Destroy(rt.gameObject);
         }

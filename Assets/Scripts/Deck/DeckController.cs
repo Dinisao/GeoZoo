@@ -18,6 +18,9 @@ public class DeckController : MonoBehaviour
     public FacePair[] Cartas;
     public bool aleatorio = false;
 
+    [Header("Tutorial (opcional)")]
+    public TutorialDeckHint tutorialHint;   // 🔹 NOVO: referência para o hint da seta
+
     [Header("Estado")]
     public bool debugLogs = true;
 
@@ -36,7 +39,11 @@ public class DeckController : MonoBehaviour
     {
         Log("Awake.");
         var btn = imgDeckBack ? imgDeckBack.GetComponent<Button>() : null;
-        if (btn != null) { btn.onClick.RemoveListener(OnDeckClick); btn.onClick.AddListener(OnDeckClick); }
+        if (btn != null)
+        {
+            btn.onClick.RemoveListener(OnDeckClick);
+            btn.onClick.AddListener(OnDeckClick);
+        }
         else LogWarn("imgDeckBack sem Button — o clique não será capturado automaticamente.");
     }
 
@@ -95,8 +102,14 @@ public class DeckController : MonoBehaviour
 
     void OnDeckClick()
     {
-        if (_busy) { Log("Ignorado (busy)."); return; }
-        if (_deckBloqueado) { Log("Ignorado (deck bloqueado)."); return; }
+        // 🔹 NOVO: sempre que carregas no deck, manda calar o tutorial (se existir)
+        if (tutorialHint != null)
+        {
+            tutorialHint.FecharHint();
+        }
+
+        if (_busy)         { Log("Ignorado (busy).");           return; }
+        if (_deckBloqueado){ Log("Ignorado (deck bloqueado)."); return; }
         if (!ValidarRefs()) return;
 
         var par = EscolherPar();
@@ -115,7 +128,8 @@ public class DeckController : MonoBehaviour
             _cartaAtual = par.Frente;
             TemCartaAtual = true;
 
-            if (imgPreview && imgPreview.canvasRenderer != null) imgPreview.canvasRenderer.SetAlpha(1f);
+            if (imgPreview && imgPreview.canvasRenderer != null)
+                imgPreview.canvasRenderer.SetAlpha(1f);
 
             var gv = FindOne<GridValidator>();
             if (gv != null)
