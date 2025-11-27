@@ -1,6 +1,3 @@
-// ControladorJogo.cs — Timer com cap a 120s, HUD otimizado e API estável.
-// Drop-in: mantém os métodos e propriedades que já usas no Deck/Grid.
-
 using TMPro;
 using UnityEngine;
 
@@ -31,6 +28,10 @@ public class ControladorJogo : MonoBehaviour
     [Tooltip("Se true, usa unscaledDeltaTime (ignora Time.timeScale).")]
     public bool usarUnscaledTime = false;
 
+    [Header("Tutorial / Timer")]
+    [Tooltip("Se true, a primeira carta comprada no deck não arranca o timer (modo tutorial).")]
+    public bool PrimeiraCartaLivreComTutorial = false;
+
     // === Leitura pública / estado ===
     public bool InteracaoPermitida { get; private set; }
     public float TempoRestanteF => Mathf.Max(0f, _tempoRestanteF);
@@ -45,10 +46,25 @@ public class ControladorJogo : MonoBehaviour
         ? Mathf.Clamp01(TempoRestanteF / MaxTempoSegundos)
         : 0f;
 
+    // === NOVO: tempo real jogado (contando bónus, etc.) ===
+    /// <summary>Tempo total de jogo (segundos em que o timer esteve a contar).</summary>
+    public float TempoJogadoF => Mathf.Max(0f, _tempoJogadoF);
+    public int   TempoJogadoInt => Mathf.RoundToInt(TempoJogadoF);
+
+    /// <summary>
+    /// True se esta run teve 1ª carta "livre" (modo tutorial ativo).
+    /// Usado para separar scores "with tutorial" / "without tutorial".
+    /// </summary>
+    public bool FoiRunComTutorial { get; private set; }
+
     // Internos
     float _tempoRestanteF;
+    float _tempoJogadoF;
     int   _zoo;
     bool  _timerAtivo;
+
+    // controla se a primeira carta já foi usada (primeira compra do deck)
+    bool _primeiraCartaJaUsada = false;
 
     // Throttle de HUD
     int _ultimoSegundoMostrado = -1;
@@ -61,24 +77,46 @@ public class ControladorJogo : MonoBehaviour
     {
         if (Instancia != null && Instancia != this) { Destroy(gameObject); return; }
         Instancia = this;
+
         SanitizarConfig();
+
         _tempoRestanteF = TempoInicialSeg;
+        _tempoJogadoF   = 0f;
+        _zoo            = 0;
+        _timerAtivo     = false;
+        _primeiraCartaJaUsada = false;
+        FoiRunComTutorial     = false;
+
         InteracaoPermitida = false;
+        // O TutorialDeckHint é que liga isto quando for uma run "com tutorial".
+        PrimeiraCartaLivreComTutorial = false;
     }
 
     void OnEnable()  => AtualizarHUD(force:true);
-    void OnValidate(){ SanitizarConfig(); AtualizarHUD(force:true); }
+
+    void OnValidate()
+    {
+        SanitizarConfig();
+        AtualizarHUD(force:true);
+    }
 
     void Update()
     {
         if (!_timerAtivo) return;
 
-        _tempoRestanteF -= Delta;
+        float dt = Delta;
+        _tempoRestanteF -= dt;
+        _tempoJogadoF   += dt;   // acumulamos tempo real de jogo
+
         if (_tempoRestanteF <= 0f)
         {
             _tempoRestanteF = 0f;
             _timerAtivo = false;
             AtualizarHUD(force:true);
+
+            // Captura automática dos dados da run para o scoreboard
+            LastRunData.Capturar(this);
+
             OnTempoEsgotado?.Invoke(_zoo);
             return;
         }
@@ -88,14 +126,47 @@ public class ControladorJogo : MonoBehaviour
 
     // ===== API pública =====
     // Chamado pelo Deck quando a carta fica no preview.
+    // Nova lógica:
+    //  - Se for a 1ª carta e PrimeiraCartaLivreComTutorial==true → não liga o timer (modo tutorial),
+    //    mas marca a run como "com tutorial".
+    //  - Caso contrário → liga o timer ao ser chamada.
     public void IniciarTimerSeAindaNao()
     {
+        // Se já está a contar, não fazemos nada.
         if (_timerAtivo) return;
+
+        // Garante que temos um tempo válido preparado
         if (_tempoRestanteF <= 0f)
             _tempoRestanteF = Mathf.Clamp(TempoInicialSeg, 1, MaxTempoSegundos);
 
+        // Primeira carta do deck:
+        if (!_primeiraCartaJaUsada)
+        {
+            _primeiraCartaJaUsada = true;
+
+            if (PrimeiraCartaLivreComTutorial)
+            {
+                // 1ª carta é “livre” → run é marcada como "com tutorial",
+                // mas ainda não ligamos o timer.
+                FoiRunComTutorial = true;
+                AtualizarHUD(force:true);
+                return;
+            }
+            // Sem tutorial → cai para o bloco que liga o timer já nesta 1ª carta.
+        }
+
+        // A partir daqui, liga o timer (1ª carta sem tutorial, ou 2ª carta em diante).
         _timerAtivo = (_tempoRestanteF > 0f);
         AtualizarHUD(force:true);
+    }
+
+    /// <summary>
+    /// Mantido para compatibilidade: marca explicitamente a primeira carta como "já usada".
+    /// Actualmente não é chamado pelo Deck, mas pode ser útil em ajustes futuros.
+    /// </summary>
+    public void MarcarPrimeiraCartaComoUsada()
+    {
+        _primeiraCartaJaUsada = true;
     }
 
     public void PararTimer() => _timerAtivo = false;
@@ -104,6 +175,13 @@ public class ControladorJogo : MonoBehaviour
     {
         _timerAtivo = false;
         _tempoRestanteF = Mathf.Clamp(TempoInicialSeg, 0, MaxTempoSegundos);
+        _tempoJogadoF   = 0f;
+        _zoo            = 0;
+
+        _primeiraCartaJaUsada = false;
+        PrimeiraCartaLivreComTutorial = false;
+        FoiRunComTutorial = false;
+
         AtualizarHUD(force:true);
     }
 

@@ -2,34 +2,34 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 
 /// <summary>
-/// Script utilitário para carregar uma cena específica e gerir o popup de confirmação.
+/// Script utilitï¿½rio para carregar uma cena especï¿½fica e gerir o popup de confirmaï¿½ï¿½o.
 /// </summary>
 public class ReturnButton : MonoBehaviour
 {
     [Tooltip("O nome exato da cena de destino (ex: Menu).")]
     public string nomeDaCenaDeMenu = "Menu";
 
-    // NOVO: Referência ao Painel de Confirmação
-    [Header("Confirmação UI")]
-    [Tooltip("O GameOject do painel pop-up de confirmação. Deve estar inicialmente inativo.")]
+    // NOVO: Referï¿½ncia ao Painel de Confirmaï¿½ï¿½o
+    [Header("Confirmaï¿½ï¿½o UI")]
+    [Tooltip("O GameOject do painel pop-up de confirmaï¿½ï¿½o. Deve estar inicialmente inativo.")]
     public GameObject PainelConfirma;
 
-    // --- Métodos de Confirmação ---
+    // --- Mï¿½todos de Confirmaï¿½ï¿½o ---
 
     /// <summary>
-    /// Chamado pelo botão principal de "Return". Mostra o painel de confirmação.
+    /// Chamado pelo botï¿½o principal de "Return". Mostra o painel de confirmaï¿½ï¿½o.
     /// </summary>
     public void PedirConfirmacao()
     {
         if (PainelConfirma != null)
         {
             PainelConfirma.SetActive(true);
-            // Time.timeScale = 0f; // Descomente para pausar o jogo durante a confirmação
+            // Time.timeScale = 0f; // Descomente para pausar o jogo durante a confirmaï¿½ï¿½o
         }
     }
 
     /// <summary>
-    /// Chamado pelo botão "Não" (Cancela). Esconde o painel e continua o jogo.
+    /// Chamado pelo botï¿½o "Nï¿½o" (Cancela). Esconde o painel e continua o jogo.
     /// </summary>
     public void CancelarVoltar()
     {
@@ -40,21 +40,19 @@ public class ReturnButton : MonoBehaviour
         }
     }
 
-    // --- Método Principal de Transição ---
+    // --- Mï¿½todo Principal de Transiï¿½ï¿½o ---
 
     /// <summary>
-    /// Chamado pelo botão "Sim" (Confirma). Carrega o menu.
+    /// Chamado pelo botï¿½o "Sim" (Confirma). Carrega o menu.
     /// </summary>
     public void VoltarParaMenu()
-    {
-        // Certifica-se que a TimeScale está normalizada se tiver sido pausada
-        // Time.timeScale = 1f; 
+{
+    // Se voltas ao Menu, no prÃ³ximo arranque de jogo queremos mostrar o tutorial.
+    TutorialDeckHint.ProximoArranqueDeveMostrarTutorial = true;
 
-        // Usa a variável pública definida no Inspector
-        SceneManager.LoadScene(nomeDaCenaDeMenu);
+    // Time.timeScale = 1f; 
 
-        // NOTA: O seu código anterior usava SceneManager.LoadScene("Menu");.
-        // Mudei para SceneManager.LoadScene(nomeDaCenaDeMenu); para usar a variável pública,
-        // o que é a melhor prática.
-    }
+    SceneManager.LoadScene(nomeDaCenaDeMenu);
+}
+
 }

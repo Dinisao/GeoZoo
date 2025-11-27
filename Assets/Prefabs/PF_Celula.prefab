@@ -93,9 +93,9 @@ MonoBehaviour:
   Index: {x: 0, y: 0}
   Bg: {fileID: 0}
   SpriteSliced: {fileID: 0}
-  CorIdle: {r: 1, g: 1, b: 1, a: 0.06}
-  CorHover: {r: 1, g: 1, b: 1, a: 0.16}
-  CorBloq: {r: 1, g: 0.3, b: 0.3, a: 0.18}
+  CorIdle: {r: 1, g: 1, b: 1, a: 0}
+  CorHover: {r: 0.003921569, g: 0.003921569, b: 0.003921569, a: 0.21960784}
+  CorBloq: {r: 0.003921569, g: 0, b: 0, a: 0}
 --- !u!114 &1040917323992721486
 MonoBehaviour:
   m_ObjectHideFlags: 0

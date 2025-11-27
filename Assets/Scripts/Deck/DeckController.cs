@@ -1,4 +1,3 @@
-// DeckController.cs — Gere a compra de cartas e o “gating” do deck.
 using System;
 using System.Collections;
 using System.Linq;
@@ -19,7 +18,7 @@ public class DeckController : MonoBehaviour
     public bool aleatorio = false;
 
     [Header("Tutorial (opcional)")]
-    public TutorialDeckHint tutorialHint;   // 🔹 NOVO: referência para o hint da seta
+    public TutorialDeckHint tutorialHint;   // referência para o hint da seta/coruja
 
     [Header("Estado")]
     public bool debugLogs = true;
@@ -33,7 +32,12 @@ public class DeckController : MonoBehaviour
     Sprite _cartaAtual;
 
     [Serializable]
-    public struct FacePair { public string Id; public Sprite Frente; public Sprite Verso; }
+    public struct FacePair
+    {
+        public string Id;
+        public Sprite Frente;
+        public Sprite Verso;
+    }
 
     void Awake()
     {
@@ -67,6 +71,7 @@ public class DeckController : MonoBehaviour
             else imgPreview.sprite = null;
             return;
         }
+
         if (posPreview != null && posPreview.childCount > 0)
         {
             var child = posPreview.GetChild(0) as RectTransform;
@@ -102,56 +107,83 @@ public class DeckController : MonoBehaviour
 
     void OnDeckClick()
     {
-        // 🔹 NOVO: sempre que carregas no deck, manda calar o tutorial (se existir)
+        // Tutorial: coruja desce / balão desaparece na fase 1, etc.
         if (tutorialHint != null)
         {
-            tutorialHint.FecharHint();
+            tutorialHint.OnDeckClicked_IniciarTransicao();
         }
 
-        if (_busy)         { Log("Ignorado (busy).");           return; }
-        if (_deckBloqueado){ Log("Ignorado (deck bloqueado)."); return; }
+        if (_busy)          { Log("Ignorado (busy).");            return; }
+        if (_deckBloqueado) { Log("Ignorado (deck bloqueado).");  return; }
         if (!ValidarRefs()) return;
 
         var par = EscolherPar();
-        if (par.Frente == null || par.Verso == null) { LogErr("Par inválido."); return; }
+        if (par.Frente == null || par.Verso == null)
+        {
+            LogErr("Par inválido.");
+            return;
+        }
 
         _deckBloqueado = true;
         _busy = true;
 
         Log($"Compra: {(string.IsNullOrEmpty(par.Id) ? "(sem Id)" : par.Id)}");
 
-        animator.Play(imgDeckBack, posCentro, posPreview, par.Frente, par.Verso, imgPreview, () =>
-        {
-            _busy = false;
-            Log("Animação concluída (deck permanece bloqueado até validação).");
+        // verso usado na animação = sprite actual do deck (fallback: Verso do par)
+        Sprite versoAnim = (imgDeckBack != null && imgDeckBack.sprite != null)
+            ? imgDeckBack.sprite
+            : par.Verso;
 
-            _cartaAtual = par.Frente;
-            TemCartaAtual = true;
-
-            if (imgPreview && imgPreview.canvasRenderer != null)
-                imgPreview.canvasRenderer.SetAlpha(1f);
-
-            var gv = FindOne<GridValidator>();
-            if (gv != null)
+        animator.Play(
+            imgDeckBack,
+            posCentro,
+            posPreview,
+            par.Frente,
+            versoAnim,
+            imgPreview,
+            () =>
             {
-                var pattern = ResolverPattern(par);
-                if (pattern != null)
-                {
-                    gv.DefinirPadraoAtivo(pattern);
-                    if (gv.Deck == null) gv.Deck = this;
+                _busy = false;
+                Log("Animação concluída (deck permanece bloqueado até validação).");
 
-                    // 🔔 INÍCIO DE NOVA RONDA → permite sparkle novamente nesta ronda
-                    PecaSparkleTrigger.NovaRonda();
-                }
-                else
-                {
-                    Debug.LogWarning("[DeckController] Nenhum AnimalPattern compatível encontrado para a carta atual. Verifica PatternRegistry/CardSprite/Id.", this);
-                }
-            }
+                _cartaAtual = par.Frente;
+                TemCartaAtual = true;
 
-            ControladorJogo.Instancia?.IniciarTimerSeAindaNao();
-            ControladorJogo.Instancia?.DefinirInteracaoTiles(true);
-        });
+                if (imgPreview && imgPreview.canvasRenderer != null)
+                    imgPreview.canvasRenderer.SetAlpha(1f);
+
+                var gv = FindOne<GridValidator>();
+                if (gv != null)
+                {
+                    var pattern = ResolverPattern(par);
+                    if (pattern != null)
+                    {
+                        gv.DefinirPadraoAtivo(pattern);
+                        if (gv.Deck == null) gv.Deck = this;
+
+                        // início de nova ronda → permite sparkle novamente
+                        PecaSparkleTrigger.NovaRonda();
+                    }
+                    else
+                    {
+                        Debug.LogWarning("[DeckController] Nenhum AnimalPattern compatível encontrado para a carta atual. Verifica PatternRegistry/CardSprite/Id.", this);
+                    }
+                }
+
+                // ⏱️ Lógica do timer:
+                //  - O ControladorJogo decide sozinho se esta é a 1ª carta "livre" (modo tutorial)
+                //    ou se o timer deve arrancar já nesta carta.
+                ControladorJogo.Instancia?.IniciarTimerSeAindaNao();
+
+                // Tiles só podem ser usados depois da carta estar em preview
+                ControladorJogo.Instancia?.DefinirInteracaoTiles(true);
+
+                // Tutorial – Fase 2 (preview à esquerda + coruja + balão + texto 2)
+                if (tutorialHint != null)
+                {
+                    tutorialHint.OnCartaChegouAoPreview(par.Frente, posPreview);
+                }
+            });
     }
 
     public void OnGridValidationChanged(bool valido, bool completo)
@@ -172,11 +204,13 @@ public class DeckController : MonoBehaviour
     FacePair EscolherPar()
     {
         if (Cartas == null || Cartas.Length == 0) return default;
+
         if (aleatorio)
         {
             int idx = UnityEngine.Random.Range(0, Cartas.Length);
             return Cartas[idx];
         }
+
         var par = Cartas[Mathf.Clamp(_nextIndex, 0, Cartas.Length - 1)];
         _nextIndex = (_nextIndex + 1) % Cartas.Length;
         return par;
@@ -198,7 +232,7 @@ public class DeckController : MonoBehaviour
         {
             var byIdExact = reg.Patterns.FirstOrDefault(p =>
                 p && (p.name.Trim().ToLowerInvariant() == id ||
-                     (p.CardSprite && p.CardSprite.name.Trim().ToLowerInvariant() == id)));
+                      (p.CardSprite && p.CardSprite.name.Trim().ToLowerInvariant() == id)));
             if (byIdExact) return byIdExact;
 
             var byContains = reg.Patterns.FirstOrDefault(p =>
@@ -206,6 +240,7 @@ public class DeckController : MonoBehaviour
                       (p.CardSprite && p.CardSprite.name.ToLowerInvariant().Contains(id))));
             if (byContains) return byContains;
         }
+
         return null;
     }
 
@@ -225,9 +260,9 @@ public class DeckController : MonoBehaviour
         return true;
     }
 
-    void Log(string m){ if (debugLogs) Debug.Log($"[DeckController] {m}", this); }
-    void LogWarn(string m){ if (debugLogs) Debug.LogWarning($"[DeckController] {m}", this); }
-    void LogErr(string m){ Debug.LogError($"[DeckController] {m}", this); }
+    void Log(string m)     { if (debugLogs) Debug.Log($"[DeckController] {m}", this); }
+    void LogWarn(string m) { if (debugLogs) Debug.LogWarning($"[DeckController] {m}", this); }
+    void LogErr(string m)  { Debug.LogError($"[DeckController] {m}", this); }
 
     static T FindOne<T>() where T : UnityEngine.Object
     {

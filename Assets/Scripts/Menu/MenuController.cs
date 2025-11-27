@@ -4,44 +4,48 @@ using UnityEngine.UI;
 
 public class MenuController : MonoBehaviour
 {
-    [Header("Referências UI")]
+    [Header("ReferÃªncias UI")]
     public Button playButton;
 
-    [Header("Configurações")]
-    [Tooltip("Nome da cena principal a carregar")]
-    public string nomeCenaPrincipal = "CenaPrincipal";
+    [Header("ConfiguraÃ§Ãµes")]
+    [Tooltip("Nome da cena principal a carregar (ex: GeoZoo)")]
+    public string nomeCenaPrincipal = "GeoZoo";
 
     void Start()
     {
-        // Adiciona o listener ao botão
         if (playButton != null)
         {
+            playButton.onClick.RemoveAllListeners();
             playButton.onClick.AddListener(IniciarJogo);
         }
         else
         {
-            Debug.LogError("Botão Play não foi atribuído no Inspector!");
+            Debug.LogError("[MenuController] BotÃ£o Play nÃ£o foi atribuÃ­do no Inspector!");
         }
     }
 
-    // Método chamado quando o botão Play é clicado
     public void IniciarJogo()
     {
-        // Carrega a cena principal
-        SceneManager.LoadScene("GeoZoo");
+        string cena = string.IsNullOrEmpty(nomeCenaPrincipal)
+            ? "GeoZoo"
+            : nomeCenaPrincipal;
+
+        // Sempre que vens do menu â†’ run COM tutorial
+        GameRunConfig.UseTutorial = true;
+
+        SceneManager.LoadScene(cena);
     }
 
-    // Método alternativo: carregar por índice da cena
+    // (mantive estes dois mÃ©todos caso queiras usar mais tarde)
     public void IniciarJogoPorIndice(int indiceCena)
     {
         SceneManager.LoadScene(indiceCena);
     }
 
-    // Método para sair do jogo
     public void SairJogo()
     {
 #if UNITY_EDITOR
-            UnityEditor.EditorApplication.isPlaying = false;
+        UnityEditor.EditorApplication.isPlaying = false;
 #else
         Application.Quit();
 #endif

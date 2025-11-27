@@ -18,6 +18,13 @@ public class Peca : MonoBehaviour,
 {
     public static event Action OnPecaStateChanged;
 
+    // Eventos para o tutorial / outros sistemas
+    public static event Action<Peca> OnPecaRodada;                       // dispara sempre que a peça roda (Q/E)
+    public static event Action<Peca, CelulaGrelha> OnPecaColocadaNaGrid; // dispara quando a peça é pousada numa célula da grid
+
+    // NOVO: evento disparado quando a peça é flipada (botão direito do rato)
+    public static event Action<Peca> OnPecaFlipada;
+
     // Refs internas (UI/RT/interaction)
     RectTransform _rt;
     Image _img;
@@ -42,9 +49,9 @@ public class Peca : MonoBehaviour,
     // Lido pelo GridValidator
     public int RotacaoGraus => (_rotacoes90 * 90);
 
-    // [NOVO] — expor estados para o GridValidator ignorar peças ainda em interação
-    public bool IsDragging => _dragging;     // [NOVO]
-    public bool IsHeld     => _leftHeld;     // [NOVO]
+    // Exposto para o tutorial/validator
+    public bool IsDragging => _dragging;
+    public bool IsHeld     => _leftHeld;
 
     // Cache de componentes essenciais; garante CanvasGroup presente.
     void Awake()
@@ -96,11 +103,13 @@ public class Peca : MonoBehaviour,
         (gfx ? gfx.rectTransform : _rt).localEulerAngles = new Vector3(0, 0, ang);
 
         OnPecaStateChanged?.Invoke();
+
+        // avisa quem quiser (tutorial, etc.) que esta peça acabou de rodar
+        OnPecaRodada?.Invoke(this);
     }
 
     // ---------- Clique/Press ----------
 
-    // Início de clique: guarda estado do botão esquerdo para rotação; no botão direito pede flip (PecaFlip).
     public void OnPointerDown(PointerEventData eventData)
     {
         if (!PodeInteragir()) return;
@@ -114,22 +123,23 @@ public class Peca : MonoBehaviour,
             var flip = GetComponent<PecaFlip>();
             if (flip != null) flip.Alternar();
             OnPecaStateChanged?.Invoke();
+
+            // NOVO: notificar que houve flip nesta peça
+            OnPecaFlipada?.Invoke(this);
         }
     }
 
-    // Solta o “held” do botão esquerdo (para parar rotação por tecla).
     public void OnPointerUp(PointerEventData eventData)
     {
         if (eventData.button == PointerEventData.InputButton.Left)
         {
             _leftHeld = false;
-            OnPecaStateChanged?.Invoke(); // [NOVO] — notifica para revalidar ao largar
+            OnPecaStateChanged?.Invoke();
         }
     }
 
     // ---------- Drag & Drop ----------
 
-    // Começa o drag: move para a dragLayer, desativa raycasts temporariamente e ajusta tamanho à célula.
     public void OnBeginDrag(PointerEventData eventData)
     {
         if (!PodeInteragir()) { eventData.pointerDrag = null; return; }
@@ -156,10 +166,9 @@ public class Peca : MonoBehaviour,
         if (_gridLayout != null) _rt.sizeDelta = _gridLayout.cellSize;
 
         SeguirRato(eventData);
-        OnPecaStateChanged?.Invoke(); // [NOVO] — estado mudou
+        OnPecaStateChanged?.Invoke();
     }
 
-    // Durante o drag: segue o cursor e atualiza o highlight da célula sob o rato (permitida/bloqueada).
     public void OnDrag(PointerEventData eventData)
     {
         if (!_dragging) return;
@@ -184,7 +193,6 @@ public class Peca : MonoBehaviour,
         }
     }
 
-    // Termina o drag: tenta “snap” na célula; se falhar, regressa à mão e repõe o estado visual completo.
     public void OnEndDrag(PointerEventData eventData)
     {
         if (!_dragging) return;
@@ -201,31 +209,38 @@ public class Peca : MonoBehaviour,
         _cg.blocksRaycasts = true;
         if (_img) _img.raycastTarget = true;
 
-        if (!TentarSnapNaGrelha(eventData))
+        // Saber se pousou mesmo na grid e em que célula
+        CelulaGrelha celDestino;
+        bool pousouNaGrid = TentarSnapNaGrelha(eventData, out celDestino);
+
+        if (!pousouNaGrid)
         {
             if (_maoContainer != null) _rt.SetParent(_maoContainer, worldPositionStays: false);
             _rt.sizeDelta = _tamanhoMao;
             _rt.localEulerAngles = Vector3.zero;
-            _rt.localScale = Vector3.one;                         // reset escala
+            _rt.localScale = Vector3.one;
             var gfx = GetComponentInChildren<Image>(true);
-            if (gfx) gfx.rectTransform.localScale = Vector3.one;  // reset escala do filho
+            if (gfx) gfx.rectTransform.localScale = Vector3.one;
+        }
+        else
+        {
+            // peça acabou de ser colocada numa célula da grid
+            OnPecaColocadaNaGrid?.Invoke(this, celDestino);
         }
 
-        OnPecaStateChanged?.Invoke(); // [NOVO] — estado mudou ao terminar drag
+        OnPecaStateChanged?.Invoke();
     }
 
-    // Mantém a peça debaixo do cursor, usando o espaço do dragLayer para evitar saltos.
     void SeguirRato(PointerEventData eventData)
     {
         if (_dragLayer == null) return;
 
         if (RectTransformUtility.ScreenPointToWorldPointInRectangle(_dragLayer, eventData.position, eventData.pressEventCamera, out var world))
         {
-            _rt.position = world; // sem offset
+            _rt.position = world;
         }
     }
 
-    // Devolve a célula (RectTransform) sob o cursor, filtrando só as que têm CelulaGrelha.
     RectTransform CelulaDebaixoDoCursor(Vector2 screenPos, Camera cam)
     {
         if (_gridRoot == null) return null;
@@ -239,14 +254,18 @@ public class Peca : MonoBehaviour,
         return null;
     }
 
-    // Tenta encaixar a peça na célula sob o cursor (se estiver livre).
-    // Também normaliza anchors/posição/escala para casar com a grelha.
-    bool TentarSnapNaGrelha(PointerEventData eventData)
+    // Agora devolve também a célula alvo via out CelulaGrelha
+    bool TentarSnapNaGrelha(PointerEventData eventData, out CelulaGrelha celulaDestino)
     {
+        celulaDestino = null;
+
         if (_gridRoot == null || _gridLayout == null) return false;
 
         var alvo = CelulaDebaixoDoCursor(eventData.position, eventData.pressEventCamera);
         if (alvo == null) return false;
+
+        var cel = alvo.GetComponent<CelulaGrelha>();
+        if (cel == null) return false;
 
         var jaTemPeca = alvo.GetComponentInChildren<Peca>(includeInactive: false) != null;
         if (jaTemPeca) return false;
@@ -255,13 +274,15 @@ public class Peca : MonoBehaviour,
         _rt.sizeDelta = _gridLayout.cellSize;
         _rt.anchorMin = _rt.anchorMax = _rt.pivot = new Vector2(0.5f, 0.5f);
         _rt.anchoredPosition = Vector2.zero;
-        _rt.localScale = Vector3.one;                         // reset escala
+        _rt.localScale = Vector3.one;
         var gfx = GetComponentInChildren<Image>(true);
-        if (gfx) gfx.rectTransform.localScale = Vector3.one;  // reset escala do filho
+        if (gfx) gfx.rectTransform.localScale = Vector3.one;
+
+        celulaDestino = cel;
         return true;
     }
 
-    // -------- NOVOS MÉTODOS DE RECOLHA --------
+    // -------- MÉTODOS DE RECOLHA --------
 
     public IEnumerator AnimarVoltarParaMao(float dur = 0.25f)
     {

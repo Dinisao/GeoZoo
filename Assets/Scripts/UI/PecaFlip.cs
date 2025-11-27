@@ -84,6 +84,13 @@ public class PecaFlip : MonoBehaviour
         }
         rt.localScale = Vector3.one;
 
+        // Avisar o sistema de tutorial que esta peça foi flipada
+        var peca = GetComponentInParent<Peca>();
+        if (peca != null)
+        {
+            PecaFlipEvents.EmitPecaFlipada(peca);
+        }
+
         _animando = false;
     }
 }

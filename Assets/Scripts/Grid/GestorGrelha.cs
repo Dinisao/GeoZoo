@@ -34,11 +34,18 @@ public class GestorGrelha : MonoBehaviour
     public bool SpawnPecasNaMaoAoIniciar = false;
     public bool IgnorarSpawnSeJaExistiremPecasNaMao = true;
 
-    [System.Serializable] public struct FacePair { public string Id; public Sprite Frente; public Sprite Verso; }
+    [System.Serializable]
+    public struct FacePair
+    {
+        public string Id;
+        public Sprite Frente;
+        public Sprite Verso;
+    }
     public FacePair[] ParIniciais = new FacePair[4];
 
     [Header("Debug")]
     public bool DebugLogs = true;
+
     public Color CorCelula = new Color(1f, 1f, 1f, 0.06f);
 
     // Repõe valores sensatos no Inspector quando o componente é adicionado.
@@ -113,7 +120,7 @@ public class GestorGrelha : MonoBehaviour
         foreach (var go in paraApagar)
         {
             if (Application.isPlaying) Destroy(go);
-            else DestroyImmediate(go);
+            else                      DestroyImmediate(go);
         }
 
         ConfigurarGridLayout();

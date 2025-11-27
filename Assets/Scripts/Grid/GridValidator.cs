@@ -1,15 +1,15 @@
 // GridValidator.cs — Compara o estado atual da grelha com o AnimalPattern ativo.
 // Observa o tabuleiro (hash) e só revalida quando algo muda. Quando casa:
-// pára o timer, aplica recompensa, opcionalmente recolhe peças, limpa preview,
-// VFX de vitória e, no fim, desbloqueia o deck.
+// pára o timer, aplica recompensa, opcionalmente toca VFX, recolhe peças, limpa preview,
+// e no fim desbloqueia o deck.
 
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;              // <- adicionado (reflection para disparar o bounce)
+using System.Reflection;              // reflection para disparar o bounce
 using UnityEngine;
-using UnityEngine.UI; // <- necessário para 'Image'
+using UnityEngine.UI;                 // necessário para 'Image'
 
 public class GridValidator : MonoBehaviour
 {
@@ -18,19 +18,21 @@ public class GridValidator : MonoBehaviour
     public DeckController Deck;
 
     [Header("FX de Vitória")]
+    [Tooltip("VFX de vídeo do animal + acesso ao shuffle extra.")]
     public AnimalWinVFX VitoriaFX;
 
     [Header("QoL")]
     [Tooltip("Quando o padrão estiver completo e válido, recolhe as peças automaticamente para a mão.")]
     public bool RecolherAoAcertar = true;
 
-    [Tooltip("Atraso (em segundos) antes de recolher as peças (0 = próximo frame).")]
+    [Tooltip("Atraso (em segundos) antes de iniciar a sequência de VFX/recolha.")]
     public float AtrasoRecolha = 0f;
 
-    [Tooltip("Se ligado, limpa a imagem de preview da carta quando acerta (com fade).")]
+    [Tooltip("Se ligado, limpa a imagem de preview da carta quando acerta (com pequeno atraso/fade).")]
     public bool LimparPreviewAoAcertar = true;
 
     [Header("Animação de Recolha")]
+    [Tooltip("Duração base usada por AnimarVoltarParaMao em cada peça.")]
     public float DurRecolha = 0.25f;
 
     [Header("Debug")]
@@ -50,10 +52,22 @@ public class GridValidator : MonoBehaviour
     {
         _ativo = ap;
         _ultimoHash = null;
+
         if (debugLogs && _ativo)
         {
-            Debug.Log($"[GridValidator] Pattern ativo: {_ativo.name} (tiles={_ativo.cellsRelatives?.Count ?? 0})", this);
-            Debug.Log($"[GridValidator] Flags: RotGlob={_ativo.PermitirRotacoesGlobais}, ExigirRot={_ativo.ExigirRotacao}, IgnorarRotEye={_ativo.IgnorarRotacaoNaCelulaEye}, MeiaVolta={_ativo.AceitarMeiaVolta}", this);
+            Debug.Log(
+                "[GridValidator] Pattern ativo: " + _ativo.name +
+                " (tiles=" + (_ativo.cellsRelatives != null ? _ativo.cellsRelatives.Count : 0) + ")",
+                this
+            );
+
+            Debug.Log(
+                "[GridValidator] Flags: RotGlob=" + _ativo.PermitirRotacoesGlobais +
+                ", ExigirRot=" + _ativo.ExigirRotacao +
+                ", IgnorarRotEye=" + _ativo.IgnorarRotacaoNaCelulaEye +
+                ", MeiaVolta=" + _ativo.AceitarMeiaVolta,
+                this
+            );
         }
     }
 
@@ -67,7 +81,9 @@ public class GridValidator : MonoBehaviour
             var any = allCells.FirstOrDefault();
             if (any) GridRoot = any.transform.parent as RectTransform;
         }
-        if (!Deck) Deck = UnityEngine.Object.FindFirstObjectByType<DeckController>(FindObjectsInactive.Include);
+
+        if (!Deck)
+            Deck = UnityEngine.Object.FindFirstObjectByType<DeckController>(FindObjectsInactive.Include);
 #else
         if (!GridRoot)
         {
@@ -75,13 +91,20 @@ public class GridValidator : MonoBehaviour
             var any = allCells.FirstOrDefault();
             if (any) GridRoot = any.transform.parent as RectTransform;
         }
-        if (!Deck) Deck = UnityEngine.Object.FindObjectOfType<DeckController>(true);
+
+        if (!Deck)
+            Deck = UnityEngine.Object.FindObjectOfType<DeckController>(true);
 #endif
     }
 
-    void OnEnable()    { Peca.OnPecaStateChanged += ForcarRevalidacao; }
-    void OnDisable()   { Peca.OnPecaStateChanged -= ForcarRevalidacao; }
-    void ForcarRevalidacao() { _ultimoHash = null; Validar(); }
+    void OnEnable()  { Peca.OnPecaStateChanged += ForcarRevalidacao; }
+    void OnDisable() { Peca.OnPecaStateChanged -= ForcarRevalidacao; }
+
+    void ForcarRevalidacao()
+    {
+        _ultimoHash = null;
+        Validar();
+    }
 
     void LateUpdate()
     {
@@ -98,43 +121,68 @@ public class GridValidator : MonoBehaviour
     // ————————————————————————————————————————————————————————————
     void Validar()
     {
-        if (_ativo == null) { Sinalizar(false, false); return; }
+        if (_ativo == null)
+        {
+            Sinalizar(false, false);
+            return;
+        }
 
         int alvo = _ativo.cellsRelatives != null ? _ativo.cellsRelatives.Count : 0;
-        if (alvo <= 0) { Sinalizar(false, false); return; }
+        if (alvo <= 0)
+        {
+            Sinalizar(false, false);
+            return;
+        }
 
         var colocadas = ColherPecasColocadas();
 
         if (debugLogs)
-            Debug.Log($"[GridValidator] colocadas={colocadas.Count} / alvo={alvo}", this);
+            Debug.Log("[GridValidator] colocadas=" + colocadas.Count + " / alvo=" + alvo, this);
 
-        if (colocadas.Count < alvo) { Sinalizar(false, false); return; }
-        if (colocadas.Count > alvo) { Sinalizar(false, true ); return; }
+        if (colocadas.Count < alvo)
+        {
+            Sinalizar(false, false);
+            return;
+        }
+        if (colocadas.Count > alvo)
+        {
+            Sinalizar(false, true);
+            return;
+        }
 
-        bool match = TentaCasar(colocadas, _ativo, exigirRotacao: _ativo.ExigirRotacao, out string dbg);
-        if (debugLogs) Debug.Log($"[GridValidator] match={match} {dbg}", this);
+        bool match = TentaCasar(colocadas, _ativo, _ativo.ExigirRotacao, out string dbg);
+        if (debugLogs)
+            Debug.Log("[GridValidator] match=" + match + " " + dbg, this);
 
         Sinalizar(match, true);
     }
 
     void Sinalizar(bool valido, bool completo)
     {
-        if (EstadoValido == valido && EstadoCompleto == completo) return;
+        if (EstadoValido == valido && EstadoCompleto == completo)
+            return;
 
-        EstadoValido = valido;
+        EstadoValido   = valido;
         EstadoCompleto = completo;
 
         if (Deck != null)
         {
-            try { Deck.OnGridValidationChanged(valido, completo); } catch { }
+            try
+            {
+                Deck.OnGridValidationChanged(valido, completo);
+            }
+            catch
+            {
+                // silencioso
+            }
         }
 
         if (valido && completo)
         {
-            // ✅ Impact bounce imediato (feedback “juicy”), compatível com ImpactBounce OU ImpactBounceUIRoot
+            // ✅ Impact bounce imediato (feedback “juicy”)
             TentarDispararImpactBounce(1f);
 
-            // Fluxo normal
+            // Fluxo de jogo
             ControladorJogo.Instancia?.PararTimer();
             ControladorJogo.Instancia?.RecompensaAcerto();
 
@@ -146,32 +194,46 @@ public class GridValidator : MonoBehaviour
         }
     }
 
+    // ————————————————————————————————————————————————————————————
+    // Sequência após acerto (vídeo animal → recolha → shuffle)
+    // ————————————————————————————————————————————————————————————
     IEnumerator CoRecolherAposAcerto()
     {
-        if (AtrasoRecolha <= 0f) yield return null;
-        else yield return new WaitForSeconds(AtrasoRecolha);
+        // Pequeno atraso opcional antes de começar tudo (se quiseres dar “respiro”).
+        if (AtrasoRecolha > 0f)
+            yield return new WaitForSeconds(AtrasoRecolha);
+        else
+            yield return null;
 
-        // Recolha ANIMADA das peças para a mão
+        // 1) VÍDEO DO ANIMAL — cartas continuam na grelha.
+        if (VitoriaFX != null)
+        {
+            yield return VitoriaFX.PlayForRoutine(_ativo);
+        }
+
+        // 2) RECOLHA ANIMADA das peças para a mão, UMA A UMA.
         yield return RecolherTodasPecasParaMaoAnimado(DurRecolha);
 
-        // Limpar preview (com fade)
+        // 3) Limpar preview (com pequeno atraso para o fade/UX).
         if (LimparPreviewAoAcertar && Deck != null)
         {
             Deck.LimparCartaAtual();
             yield return new WaitForSeconds(0.26f);
         }
 
-        // Vídeo de vitória (se mapeado)
+        // 4) VÍDEO DE SHUFFLE DO DECK (se estiver configurado).
         if (VitoriaFX != null)
         {
-            yield return VitoriaFX.PlayForRoutine(_ativo);
+            // PlayShuffleExtraOnly já verifica internamente se há ShuffleVFX ou não.
+            yield return VitoriaFX.PlayShuffleExtraOnly();
         }
 
-        // Deck pronto para nova compra
-        if (Deck != null) Deck.DesbloquearDeck();
+        // 5) Deck pronto para nova compra.
+        if (Deck != null)
+            Deck.DesbloquearDeck();
 
-        // Reset & revalidação
-        _ultimoHash = null;
+        // 6) Reset & revalidação
+        _ultimoHash    = null;
         _resetAgendado = false;
         Validar();
     }
@@ -181,11 +243,11 @@ public class GridValidator : MonoBehaviour
     // ————————————————————————————————————————————————————————————
     struct Colocada
     {
-        public Vector2Int cell;
-        public int rot;
-        public EyeRequirement eye;
+        public Vector2Int      cell;
+        public int             rot;
+        public EyeRequirement  eye;
 #if UNITY_EDITOR
-        public string debug;
+        public string          debug;
 #endif
     }
 
@@ -198,6 +260,7 @@ public class GridValidator : MonoBehaviour
         {
             var cellRT = GridRoot.GetChild(i) as RectTransform;
             if (!cellRT) continue;
+
             var cel = cellRT.GetComponent<CelulaGrelha>();
             if (!cel) continue;
 
@@ -221,22 +284,43 @@ public class GridValidator : MonoBehaviour
             var flip = peca.GetComponent<PecaFlip>();
             EyeRequirement eye = EyeRequirement.None;
             string dbg = "FRENTE";
+
             if (flip != null)
             {
                 if (!flip.EstaNaFrente)
                 {
                     string fname = flip.Frente ? flip.Frente.name : "";
                     int lastDigit = -1;
-                    for (int k = fname.Length - 1; k >= 0; k--)
-                        if (char.IsDigit(fname[k])) { lastDigit = fname[k] - '0'; break; }
 
-                    if (lastDigit == 1 || lastDigit == 2) { eye = EyeRequirement.Eye;   dbg = "VERSO(F→Eye)"; }
-                    else if (lastDigit == 3 || lastDigit == 4){ eye = EyeRequirement.NoEye; dbg = "VERSO(F→NoEye)"; }
-                    else { eye = EyeRequirement.NoEye; dbg = "VERSO(F?=NoEye)"; }
+                    for (int k = fname.Length - 1; k >= 0; k--)
+                    {
+                        if (char.IsDigit(fname[k]))
+                        {
+                            lastDigit = fname[k] - '0';
+                            break;
+                        }
+                    }
+
+                    if (lastDigit == 1 || lastDigit == 2)
+                    {
+                        eye = EyeRequirement.Eye;
+                        dbg = "VERSO(F→Eye)";
+                    }
+                    else if (lastDigit == 3 || lastDigit == 4)
+                    {
+                        eye = EyeRequirement.NoEye;
+                        dbg = "VERSO(F→NoEye)";
+                    }
+                    else
+                    {
+                        eye = EyeRequirement.NoEye;
+                        dbg = "VERSO(F?=NoEye)";
+                    }
                 }
             }
 
-            outList.Add(new Colocada {
+            outList.Add(new Colocada
+            {
                 cell = cel.Index,
                 rot  = rot,
                 eye  = eye
@@ -258,8 +342,10 @@ public class GridValidator : MonoBehaviour
 
         int minX = colocadas.Min(c => c.cell.x);
         int minY = colocadas.Min(c => c.cell.y);
+
         var colocadasNorm = colocadas
-            .Select(c => new Colocada {
+            .Select(c => new Colocada
+            {
                 cell = new Vector2Int(c.cell.x - minX, c.cell.y - minY),
                 rot  = c.rot,
                 eye  = c.eye
@@ -267,7 +353,8 @@ public class GridValidator : MonoBehaviour
                 , debug = c.debug
 #endif
             })
-            .OrderBy(c => c.cell.y).ThenBy(c => c.cell.x)
+            .OrderBy(c => c.cell.y)
+            .ThenBy(c => c.cell.x)
             .ToList();
 
         var rel  = ap.cellsRelatives ?? new List<Vector2Int>();
@@ -283,15 +370,27 @@ public class GridValidator : MonoBehaviour
             expectedBase.Add((pos, rot, eye));
         }
 
-        var rotacoesGlobais = ap.PermitirRotacoesGlobais ? new[] {0,90,180,270} : new[] {0};
+        var rotacoesGlobais = ap.PermitirRotacoesGlobais
+            ? new[] { 0, 90, 180, 270 }
+            : new[] { 0 };
+
+        var rotadores = new System.Func<Vector2Int, int, Vector2Int>[]
+        {
+            RotacionarMath,
+            RotacionarUI
+        };
+
         foreach (int rGlobal in rotacoesGlobais)
         {
-            foreach (var rotFn in new System.Func<Vector2Int,int,Vector2Int>[] { RotacionarMath, RotacionarUI })
+            foreach (var rotFn in rotadores)
             {
-                var expCells = expectedBase.Select(e => rotFn(e.pos, rGlobal)).ToList();
+                var expCells = expectedBase
+                    .Select(e => rotFn(e.pos, rGlobal))
+                    .ToList();
 
                 int eMinX = expCells.Min(v => v.x);
                 int eMinY = expCells.Min(v => v.y);
+
                 for (int i = 0; i < expCells.Count; i++)
                     expCells[i] = new Vector2Int(expCells[i].x - eMinX, expCells[i].y - eMinY);
 
@@ -299,18 +398,29 @@ public class GridValidator : MonoBehaviour
                 for (int i = 0; i < expectedBase.Count; i++)
                 {
                     int baseRotMath = expectedBase[i].rot;
-                    int apply = (rotFn == RotacionarUI) ? NormRot(baseRotMath - rGlobal) : NormRot(baseRotMath + rGlobal);
+                    int apply = (rotFn == RotacionarUI)
+                        ? NormRot(baseRotMath - rGlobal)
+                        : NormRot(baseRotMath + rGlobal);
+
                     expRots.Add(apply);
                 }
 
                 var expEyes = expectedBase.Select(e => e.eye).ToList();
 
                 var expected = Enumerable.Range(0, expectedBase.Count)
-                    .Select(i => new { pos = expCells[i], rot = expRots[i], eye = expEyes[i] })
-                    .OrderBy(e => e.pos.y).ThenBy(e => e.pos.x)
+                    .Select(i => new
+                    {
+                        pos = expCells[i],
+                        rot = expRots[i],
+                        eye = expEyes[i]
+                    })
+                    .OrderBy(e => e.pos.y)
+                    .ThenBy(e => e.pos.x)
                     .ToList();
 
-                if (expected.Count != colocadasNorm.Count) continue;
+                if (expected.Count != colocadasNorm.Count)
+                    continue;
+
                 bool ok = true;
 
                 for (int i = 0; i < expected.Count; i++)
@@ -318,7 +428,11 @@ public class GridValidator : MonoBehaviour
                     var got = colocadasNorm[i];
                     var exp = expected[i];
 
-                    if (got.cell != exp.pos) { ok = false; break; }
+                    if (got.cell != exp.pos)
+                    {
+                        ok = false;
+                        break;
+                    }
 
                     if (exigirRotacao)
                     {
@@ -327,26 +441,52 @@ public class GridValidator : MonoBehaviour
                         {
                             int gr = NormRot(got.rot);
                             int er = NormRot(exp.rot);
-                            bool rotOk = (gr == er) || (ap.AceitarMeiaVolta && gr == NormRot(er + 180));
-                            if (!rotOk) { ok = false; break; }
+
+                            bool rotOk =
+                                (gr == er) ||
+                                (ap.AceitarMeiaVolta && gr == NormRot(er + 180));
+
+                            if (!rotOk)
+                            {
+                                ok = false;
+                                break;
+                            }
                         }
                     }
 
                     if (exp.eye == EyeRequirement.Eye)
                     {
-                        if (got.eye != EyeRequirement.Eye) { ok = false; break; }
+                        if (got.eye != EyeRequirement.Eye)
+                        {
+                            ok = false;
+                            break;
+                        }
                     }
                     else if (exp.eye == EyeRequirement.NoEye)
                     {
-                        if (got.eye != EyeRequirement.NoEye) { ok = false; break; }
+                        if (got.eye != EyeRequirement.NoEye)
+                        {
+                            ok = false;
+                            break;
+                        }
                     }
                     else
                     {
-                        if (got.eye == EyeRequirement.Eye) { ok = false; break; }
+                        if (got.eye == EyeRequirement.Eye)
+                        {
+                            ok = false;
+                            break;
+                        }
                     }
                 }
 
-                if (ok) { dbg = $"(rGlobal={rGlobal}, rotFn={(rotFn==RotacionarMath?"Math":"UI")}, exigirRot={exigirRotacao})"; return true; }
+                if (ok)
+                {
+                    dbg = "(rGlobal=" + rGlobal +
+                          ", rotFn=" + (rotFn == RotacionarMath ? "Math" : "UI") +
+                          ", exigirRot=" + exigirRotacao + ")";
+                    return true;
+                }
             }
         }
 
@@ -359,31 +499,35 @@ public class GridValidator : MonoBehaviour
     // ————————————————————————————————————————————————————————————
     static int NormRot(float graus)
     {
-        int g = Mathf.RoundToInt(graus) % 360; if (g < 0) g += 360;
+        int g = Mathf.RoundToInt(graus) % 360;
+        if (g < 0) g += 360;
+
         int q = Mathf.RoundToInt(g / 90f) * 90;
         return (q % 360 + 360) % 360;
     }
 
     static Vector2Int RotacionarMath(Vector2Int v, int graus)
     {
-        switch (((graus % 360) + 360) % 360)
+        int g = ((graus % 360) + 360) % 360;
+        switch (g)
         {
-            case 0:   return new Vector2Int(v.x, v.y);
-            case 90:  return new Vector2Int(v.y, -v.x);
+            case 0:   return new Vector2Int(v.x,   v.y);
+            case 90:  return new Vector2Int(v.y,  -v.x);
             case 180: return new Vector2Int(-v.x, -v.y);
-            case 270: return new Vector2Int(-v.y, v.x);
+            case 270: return new Vector2Int(-v.y,  v.x);
             default:  return v;
         }
     }
 
     static Vector2Int RotacionarUI(Vector2Int v, int graus)
     {
-        switch (((graus % 360) + 360) % 360)
+        int g = ((graus % 360) + 360) % 360;
+        switch (g)
         {
-            case 0:   return new Vector2Int(v.x, v.y);
-            case 90:  return new Vector2Int(-v.y, v.x);
+            case 0:   return new Vector2Int(v.x,   v.y);
+            case 90:  return new Vector2Int(-v.y,  v.x);
             case 180: return new Vector2Int(-v.x, -v.y);
-            case 270: return new Vector2Int(v.y, -v.x);
+            case 270: return new Vector2Int(v.y,  -v.x);
             default:  return v;
         }
     }
@@ -391,10 +535,14 @@ public class GridValidator : MonoBehaviour
     string HashDoTabuleiro()
     {
         var list = ColherPecasColocadas()
-            .OrderBy(c => c.cell.y).ThenBy(c => c.cell.x)
-            .Select(c => $"{c.cell.x},{c.cell.y},{c.rot},{(int)c.eye}")
+            .OrderBy(c => c.cell.y)
+            .ThenBy(c => c.cell.x)
+            .Select(c => c.cell.x + "," + c.cell.y + "," + c.rot + "," + (int)c.eye)
             .ToArray();
-        return _ativo ? $"{_ativo.GetInstanceID()}|{string.Join(";", list)}" : string.Join(";", list);
+
+        return _ativo
+            ? _ativo.GetInstanceID() + "|" + string.Join(";", list)
+            : string.Join(";", list);
     }
 
     // ——— Recolhas ———
@@ -410,6 +558,7 @@ public class GridValidator : MonoBehaviour
             var peca = cellRT.GetComponentInChildren<Peca>(includeInactive: false);
             if (peca != null)
             {
+                // corre cada peça de forma sequencial: 1 → 2 → 3 → 4
                 yield return peca.AnimarVoltarParaMao(dur);
             }
         }
@@ -425,7 +574,8 @@ public class GridValidator : MonoBehaviour
             if (!cellRT) continue;
 
             var peca = cellRT.GetComponentInChildren<Peca>(includeInactive: false);
-            if (peca != null) peca.VoltarParaMao();
+            if (peca != null)
+                peca.VoltarParaMao();
         }
     }
 
@@ -463,7 +613,10 @@ public class GridValidator : MonoBehaviour
                         else m.Invoke(mb, new object[] { intensity });
                         return;
                     }
-                    catch { /* silencioso */ }
+                    catch
+                    {
+                        // silencioso
+                    }
                 }
             }
         }
@@ -473,10 +626,9 @@ public class GridValidator : MonoBehaviour
     {
         try
         {
-            var t = Type.GetType(tipoNome); // tenta full-name default
+            var t = Type.GetType(tipoNome);
             if (t == null)
             {
-                // procurar por nome simples em todos os assemblies
                 foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
                 {
                     t = asm.GetTypes().FirstOrDefault(x => x.Name == tipoNome);
@@ -485,23 +637,23 @@ public class GridValidator : MonoBehaviour
             }
             if (t == null) return false;
 
-            // tentar propriedade estática "Instancia"
             var instProp = t.GetProperty("Instancia", BindingFlags.Public | BindingFlags.Static);
-            var inst = instProp?.GetValue(null);
-            if (inst != null)
-            {
-                var m = t.GetMethod("Play", new Type[] { typeof(float) })
-                      ?? t.GetMethod("Play", Type.EmptyTypes);
-                if (m != null)
-                {
-                    if (m.GetParameters().Length == 0) m.Invoke(inst, null);
-                    else m.Invoke(inst, new object[] { intensity });
-                    return true;
-                }
-            }
-        }
-        catch { /* silencioso */ }
+            var inst = instProp != null ? instProp.GetValue(null) : null;
+            if (inst == null) return false;
 
-        return false;
+            var m = t.GetMethod("Play", new Type[] { typeof(float) })
+                  ?? t.GetMethod("Play", Type.EmptyTypes);
+
+            if (m == null) return false;
+
+            if (m.GetParameters().Length == 0) m.Invoke(inst, null);
+            else m.Invoke(inst, new object[] { intensity });
+
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
     }
 }
