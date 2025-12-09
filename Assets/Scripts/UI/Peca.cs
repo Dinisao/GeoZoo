@@ -1,6 +1,6 @@
 // Peca.cs — Peça arrastável/rodável da grelha.
-// Lida com: drag & drop para células, rotação (Q/E) enquanto premida,
-// flip no botão direito (via PecaFlip), highlight de célula sob o cursor,
+// Lida com: drag & drop para células, rotação (clique/toque),
+// flip (duplo clique/toque), highlight de célula sob o cursor,
 // recolha para a mão (instantânea ou animada) e gating de interação com o jogo.
 
 using System;
@@ -14,15 +14,15 @@ using UnityEngine.UI;
 [DisallowMultipleComponent]
 public class Peca : MonoBehaviour,
     IBeginDragHandler, IDragHandler, IEndDragHandler,
-    IPointerDownHandler, IPointerUpHandler
+    IPointerDownHandler, IPointerUpHandler, IPointerClickHandler // Adicionado IPointerClickHandler para clique simples/duplo
 {
     public static event Action OnPecaStateChanged;
 
     // Eventos para o tutorial / outros sistemas
-    public static event Action<Peca> OnPecaRodada;                       // dispara sempre que a peça roda (Q/E)
+    public static event Action<Peca> OnPecaRodada; 			    // dispara sempre que a peça roda
     public static event Action<Peca, CelulaGrelha> OnPecaColocadaNaGrid; // dispara quando a peça é pousada numa célula da grid
 
-    // NOVO: evento disparado quando a peça é flipada (botão direito do rato)
+    // Evento disparado quando a peça é flipada
     public static event Action<Peca> OnPecaFlipada;
 
     // Refs internas (UI/RT/interaction)
@@ -39,27 +39,31 @@ public class Peca : MonoBehaviour,
 
     // Estado de input/drag/rotação
     bool _dragging;
-    bool _leftHeld;                // rotação Q/E enquanto carregado
+    bool _leftHeld; 				// mantido no toque (para drag/rotação imediata)
     Transform _paiOriginal;
     int _irmIndexOriginal;
     Vector2 _tamanhoMao;
-    int _rotacoes90;               // 0..3
-    RectTransform _hoverCell;      // highlight atual
+    int _rotacoes90; 				// 0..3
+    RectTransform _hoverCell; 		// highlight atual
+
+    // Variáveis para deteção de Duplo Clique/Toque para Flip
+    const float DoubleClickTime = 0.3f; // Tempo máximo entre cliques para ser considerado duplo clique
+    float _lastClickTime;
 
     // Lido pelo GridValidator
     public int RotacaoGraus => (_rotacoes90 * 90);
 
     // Exposto para o tutorial/validator
     public bool IsDragging => _dragging;
-    public bool IsHeld     => _leftHeld;
+    public bool IsHeld => _leftHeld;
 
     // Cache de componentes essenciais; garante CanvasGroup presente.
     void Awake()
     {
         _rt = GetComponent<RectTransform>();
         _img = GetComponent<Image>();
-        _le  = GetComponent<LayoutElement>();
-        _cg  = GetComponent<CanvasGroup>();
+        _le = GetComponent<LayoutElement>();
+        _cg = GetComponent<CanvasGroup>();
         if (_cg == null) _cg = gameObject.AddComponent<CanvasGroup>();
     }
 
@@ -76,13 +80,14 @@ public class Peca : MonoBehaviour,
     // Recebe as referências do contexto (grelha/mão/layer de drag) vindas do GestorGrelha.
     public void ConfigurarContexto(RectTransform gridRoot, GridLayoutGroup gridLayout, RectTransform maoContainer, RectTransform dragLayer)
     {
-        _gridRoot     = gridRoot;
-        _gridLayout   = gridLayout;
+        _gridRoot = gridRoot;
+        _gridLayout = gridLayout;
         _maoContainer = maoContainer;
-        _dragLayer    = dragLayer;
+        _dragLayer = dragLayer;
     }
 
-    // Enquanto a peça está clicada/dragging, permite rotação por Q/E (se interação for permitida).
+    // Remove o Update() original que lia Q/E, já não é necessário
+    /*
     void Update()
     {
         if (!(_leftHeld || _dragging)) return;
@@ -91,6 +96,7 @@ public class Peca : MonoBehaviour,
         if (Input.GetKeyDown(KeyCode.Q)) Rodar(-1);
         if (Input.GetKeyDown(KeyCode.E)) Rodar(+1);
     }
+    */
 
     // Ajusta a rotação em incrementos de 90° e aplica no visual (filho Image, se existir).
     void Rodar(int dir)
@@ -108,25 +114,19 @@ public class Peca : MonoBehaviour,
         OnPecaRodada?.Invoke(this);
     }
 
-    // ---------- Clique/Press ----------
+    // ---------- Clique/Press/Toque ----------
 
     public void OnPointerDown(PointerEventData eventData)
     {
         if (!PodeInteragir()) return;
 
+        // Apenas processa o clique esquerdo (toque)
         if (eventData.button == PointerEventData.InputButton.Left)
         {
             _leftHeld = true;
         }
-        else if (eventData.button == PointerEventData.InputButton.Right)
-        {
-            var flip = GetComponent<PecaFlip>();
-            if (flip != null) flip.Alternar();
-            OnPecaStateChanged?.Invoke();
 
-            // NOVO: notificar que houve flip nesta peça
-            OnPecaFlipada?.Invoke(this);
-        }
+        // **Removido:** a lógica do botão direito (flip) é agora no OnPointerClick (duplo clique)
     }
 
     public void OnPointerUp(PointerEventData eventData)
@@ -138,11 +138,50 @@ public class Peca : MonoBehaviour,
         }
     }
 
+    public void OnPointerClick(PointerEventData eventData)
+    {
+        if (!PodeInteragir() || eventData.button != PointerEventData.InputButton.Left) return;
+
+        // 1. Lógica de Duplo Clique (Flip)
+        if (Time.time - _lastClickTime < DoubleClickTime)
+        {
+            // Duplo clique detectado -> Flip
+            var flip = GetComponent<PecaFlip>();
+            if (flip != null) flip.Alternar();
+            OnPecaStateChanged?.Invoke();
+
+            // notificar que houve flip nesta peça
+            OnPecaFlipada?.Invoke(this);
+
+            // "Consome" o clique para evitar a rotação
+            _lastClickTime = 0;
+            return;
+        }
+
+        // 2. Lógica de Clique Simples (Rotação)
+        // A rotação só deve ocorrer se NÃO for o início de um Drag
+        if (!_dragging)
+        {
+            // Clique simples detectado -> Rodar 
+            // Rodamos apenas se o tempo for suficiente para excluir o duplo clique
+            // e se não estivermos a arrastar.
+            Rodar(+1);
+        }
+
+        // Atualiza o tempo do último clique
+        _lastClickTime = Time.time;
+    }
+
+
     // ---------- Drag & Drop ----------
 
     public void OnBeginDrag(PointerEventData eventData)
     {
-        if (!PodeInteragir()) { eventData.pointerDrag = null; return; }
+        if (!PodeInteragir() || eventData.button != PointerEventData.InputButton.Left) { eventData.pointerDrag = null; return; }
+
+        // Se começar a arrastar, ignoramos a lógica do clique simples/duplo por agora
+        _lastClickTime = 0;
+
         _dragging = true;
 
         // segurança: zera escala antes de mexer
