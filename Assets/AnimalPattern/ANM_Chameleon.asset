@@ -18,8 +18,8 @@ MonoBehaviour:
   - {x: 1, y: 0}
   - {x: 2, y: 0}
   - {x: 0, y: 1}
-  cellsRotations: 5a0000000000000000000000b4000000
-  cellsEyeReq: 00000000000000000100000000000000
+  cellsRotations: 0e010000b40000005a00000000000000
+  cellsEyeReq: 02000000000000000100000000000000
   ExigirRotacao: 1
   PermitirRotacoesGlobais: 1
   PermitirFlipH: 0

@@ -10,7 +10,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: d8cf6e79c9100fa49b5ff6e253477d3f, type: 3}
-  m_Name: ANM_Bear
+  m_Name: ANM_bear
   m_EditorClassIdentifier: Assembly-CSharp::AnimalPattern
   CardSprite: {fileID: 21300000, guid: aa9cd678d49230b428a114e551093324, type: 3}
   cellsRelatives:
@@ -18,7 +18,7 @@ MonoBehaviour:
   - {x: 2, y: 0}
   - {x: 0, y: 1}
   - {x: 1, y: 1}
-  cellsRotations: 5a0000000e0100005a000000b4000000
+  cellsRotations: 0e010000000000000e01000000000000
   cellsEyeReq: 00000000010000000000000000000000
   ExigirRotacao: 1
   PermitirRotacoesGlobais: 1
